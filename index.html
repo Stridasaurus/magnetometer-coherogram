@@ -3,1409 +3,1187 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Global Magnetometer Network Coherogram Visualizer</title>
+<title>Global Magnetometer Network Coherogram</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
-  :root {
-    --bg: #0a0c12;
-    --surface: #111520;
-    --surface2: #161b27;
-    --border: #1f2a3c;
-    --accent: #4f9cf9;
-    --accent2: #7b5cf9;
-    --text: #d4ddf0;
-    --text-dim: #7a8aaa;
-    --success: #3ecf8e;
-    --warn: #f9a825;
-    --danger: #f05050;
-    --inferno-peak: #fcffa4;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-    font-size: 13px;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
+:root {
+  --bg: #0a0c12; --surface: #111520; --surface2: #161b27;
+  --border: #1f2a3c; --accent: #4f9cf9; --accent2: #7b5cf9;
+  --text: #d4ddf0; --text-dim: #7a8aaa;
+  --success: #3ecf8e; --warn: #f9a825; --danger: #f05050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI',system-ui,sans-serif; font-size: 13px; min-height: 100vh; display: flex; flex-direction: column; overflow: hidden; height: 100vh; }
 
-  /* ── Header ── */
-  .app-header {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 10px 20px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-shrink: 0;
-  }
-  .app-header h1 {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--text);
-    white-space: nowrap;
-  }
-  .app-header .subtitle {
-    font-size: 11px;
-    color: var(--text-dim);
-    white-space: nowrap;
-  }
-  .header-sep { flex: 1; }
+/* ── Header ── */
+.app-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 18px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.app-header h1 { font-size: 14px; font-weight: 600; white-space: nowrap; }
+.app-header .sub { font-size: 11px; color: var(--text-dim); }
+.hdr-sep { flex: 1; }
 
-  /* ── Toolbar ── */
-  .toolbar {
-    background: var(--surface2);
-    border-bottom: 1px solid var(--border);
-    padding: 8px 20px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
-    flex-shrink: 0;
-  }
-  .toolbar-group {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .toolbar label {
-    color: var(--text-dim);
-    font-size: 11px;
-    white-space: nowrap;
-  }
-  .toolbar select, .toolbar input[type=number] {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 4px 8px;
-    border-radius: 5px;
-    font-size: 12px;
-    outline: none;
-    transition: border-color 0.15s;
-  }
-  .toolbar select:focus, .toolbar input[type=number]:focus {
-    border-color: var(--accent);
-  }
-  .toolbar input[type=number] { width: 70px; }
-  .toolbar select { min-width: 180px; }
+/* ── Toolbar ── */
+.toolbar { background: var(--surface2); border-bottom: 1px solid var(--border); padding: 6px 18px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; flex-shrink: 0; }
+.tg { display: flex; align-items: center; gap: 5px; }
+.toolbar label { color: var(--text-dim); font-size: 11px; white-space: nowrap; }
+.toolbar select, .toolbar input[type=number] { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 3px 7px; border-radius: 5px; font-size: 12px; outline: none; }
+.toolbar select:focus, .toolbar input[type=number]:focus { border-color: var(--accent); }
+.toolbar input[type=number] { width: 66px; }
+.toolbar select { min-width: 170px; }
+.toolbar-sep { width: 1px; height: 20px; background: var(--border); }
+.chk-label { display: flex; align-items: center; gap: 5px; color: var(--text-dim); font-size: 11px; cursor: pointer; user-select: none; }
+.chk-label input { accent-color: var(--accent); }
 
-  .btn {
-    padding: 5px 16px;
-    border-radius: 5px;
-    border: none;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: opacity 0.15s, transform 0.1s;
-  }
-  .btn:active { transform: scale(0.97); }
-  .btn-primary {
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    color: #fff;
-  }
-  .btn-primary:hover { opacity: 0.88; }
-  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn { padding: 4px 14px; border-radius: 5px; border: none; font-size: 12px; font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
+.btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
+.btn-primary:hover { opacity: 0.85; }
+.btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn-secondary { background: var(--surface); border: 1px solid var(--border); color: var(--text-dim); }
+.btn-secondary.active { border-color: var(--success); color: var(--success); }
+.btn-secondary:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
 
-  /* ── Station pills ── */
-  .station-bar {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 7px 20px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-    flex-wrap: wrap;
-  }
-  .station-bar-label {
-    color: var(--text-dim);
-    font-size: 11px;
-    margin-right: 4px;
-    white-space: nowrap;
-  }
-  .station-pill {
-    padding: 3px 11px;
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    background: var(--surface2);
-    color: var(--text-dim);
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    letter-spacing: 0.03em;
-    transition: all 0.15s;
-    user-select: none;
-  }
-  .station-pill.active {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
-  }
-  .station-pill:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+/* ── Station bar ── */
+.station-bar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 5px 18px; display: flex; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
+.sbar-label { color: var(--text-dim); font-size: 11px; margin-right: 2px; }
+.station-pill { padding: 2px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface2); color: var(--text-dim); font-size: 11px; font-weight: 600; cursor: pointer; letter-spacing: 0.03em; transition: all 0.15s; user-select: none; }
+.station-pill.active { color: #fff; }
+.station-pill:hover:not(.active) { border-color: var(--accent); }
 
-  /* ── Metric cards ── */
-  .metrics-bar {
-    display: flex;
-    gap: 12px;
-    padding: 10px 20px;
-    flex-shrink: 0;
-    flex-wrap: wrap;
-  }
-  .metric-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 16px;
-    min-width: 120px;
-    flex: 1;
-  }
-  .metric-label {
-    font-size: 10px;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    margin-bottom: 3px;
-  }
-  .metric-value {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--accent);
-    font-variant-numeric: tabular-nums;
-  }
-  .metric-unit {
-    font-size: 11px;
-    color: var(--text-dim);
-    margin-left: 3px;
-  }
+/* ── Metrics ── */
+.metrics-bar { display: flex; gap: 10px; padding: 8px 18px; flex-shrink: 0; flex-wrap: wrap; }
+.mc { background: var(--surface); border: 1px solid var(--border); border-radius: 7px; padding: 6px 14px; flex: 1; min-width: 100px; }
+.mc-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 2px; }
+.mc-value { font-size: 18px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.mc-unit { font-size: 10px; color: var(--text-dim); margin-left: 2px; }
 
-  /* ── Status bar ── */
-  .status-bar {
-    background: var(--surface2);
-    border-top: 1px solid var(--border);
-    padding: 5px 20px;
-    font-size: 11px;
-    color: var(--text-dim);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-shrink: 0;
-    min-height: 26px;
-  }
-  .status-dot {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: var(--text-dim);
-    flex-shrink: 0;
-  }
-  .status-dot.ok { background: var(--success); }
-  .status-dot.busy { background: var(--warn); animation: pulse 1s infinite; }
-  .status-dot.err { background: var(--danger); }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+/* ── Main ── */
+.main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+.tab-bar { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; overflow-x: auto; }
+.tab { padding: 8px 18px; font-size: 12px; color: var(--text-dim); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; user-select: none; white-space: nowrap; }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab:hover:not(.active) { color: var(--text); }
+.panels { flex: 1; overflow: hidden; min-height: 0; }
+.panel { display: none; height: 100%; padding: 12px 18px; overflow: auto; }
+.panel.active { display: flex; flex-direction: column; gap: 10px; }
 
-  /* ── Tabs ── */
-  .main-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    min-height: 0;
-  }
-  .tab-bar {
-    display: flex;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-  }
-  .tab {
-    padding: 9px 20px;
-    font-size: 12px;
-    color: var(--text-dim);
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    transition: all 0.15s;
-    user-select: none;
-    white-space: nowrap;
-  }
-  .tab.active {
-    color: var(--accent);
-    border-bottom-color: var(--accent);
-  }
-  .tab:hover:not(.active) { color: var(--text); }
+/* ── Coherogram panel ── */
+.coh-wrap { flex: 1; min-height: 220px; position: relative; background: #000; border-radius: 8px; border: 1px solid var(--border); overflow: hidden; cursor: crosshair; }
+#coherogramCanvas { display: block; width: 100%; height: 100%; }
+.coh-placeholder { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-dim); gap: 10px; text-align: center; padding: 20px; background: #000; z-index: 2; }
+.coh-placeholder .bi { font-size: 34px; opacity: 0.35; }
+.coh-tooltip { position: absolute; background: rgba(10,12,20,0.92); border: 1px solid var(--border); border-radius: 5px; padding: 5px 9px; font-size: 11px; pointer-events: none; white-space: nowrap; z-index: 5; display: none; }
 
-  .panels {
-    flex: 1;
-    overflow: hidden;
-    min-height: 0;
-  }
-  .panel {
-    display: none;
-    height: 100%;
-    padding: 16px 20px;
-    overflow: auto;
-  }
-  .panel.active { display: flex; flex-direction: column; gap: 12px; }
+/* ── Colorbar ── */
+.colorbar-row { display: flex; align-items: center; gap: 8px; height: 20px; }
+.cb-label { font-size: 11px; color: var(--text-dim); white-space: nowrap; }
+#colorbarCanvas { flex: 1; height: 16px; border-radius: 3px; border: 1px solid var(--border); }
+.cb-ticks { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-dim); margin-top: 1px; padding: 0 1px; }
+.axis-info { font-size: 10px; color: var(--text-dim); text-align: center; }
 
-  /* ── Coherogram panel ── */
-  .coherogram-container {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .coherogram-wrap {
-    flex: 1;
-    min-height: 280px;
-    position: relative;
-    background: #000;
-    border-radius: 8px;
-    overflow: hidden;
-    border: 1px solid var(--border);
-  }
-  #coherogramCanvas {
-    width: 100%;
-    height: 100%;
-    display: block;
-  }
-  .coherogram-placeholder {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-dim);
-    gap: 8px;
-    font-size: 13px;
-  }
-  .coherogram-placeholder .big-icon { font-size: 36px; opacity: 0.4; }
+/* ── Detail panel ── */
+.detail-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: none; flex-direction: column; gap: 8px; max-height: 240px; }
+.detail-panel.open { display: flex; }
+.detail-header { display: flex; align-items: center; gap: 10px; }
+.detail-title { font-size: 12px; font-weight: 600; color: var(--text); flex: 1; }
+.detail-close { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; padding: 0 4px; }
+.detail-body { display: flex; gap: 12px; flex: 1; min-height: 0; overflow: hidden; }
+.detail-chart-wrap { flex: 1; min-height: 140px; position: relative; }
+.detail-pairs { width: 160px; overflow-y: auto; font-size: 11px; }
+.pair-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.pair-swatch { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.pair-name { color: var(--text-dim); flex: 1; }
+.pair-val { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
 
-  /* Colorbar */
-  .colorbar-wrap {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    height: 24px;
-  }
-  .colorbar-label { font-size: 11px; color: var(--text-dim); white-space: nowrap; }
-  #colorbarCanvas {
-    flex: 1;
-    height: 18px;
-    border-radius: 3px;
-    border: 1px solid var(--border);
-  }
-  .colorbar-ticks {
-    flex: 1;
-    display: flex;
-    justify-content: space-between;
-    font-size: 10px;
-    color: var(--text-dim);
-    margin-top: 2px;
-  }
+/* ── Chart panels ── */
+.chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.chart-card h3 { font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; flex-shrink: 0; }
+.chart-wrap { position: relative; flex: 1; min-height: 280px; }
+.chart-wrap .empty-state { position: absolute; inset: 0; background: var(--surface); z-index: 2; border-radius: 4px; }
 
-  /* ── Chart panels ── */
-  .chart-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px;
-    flex: 1;
-    min-height: 0;
-  }
-  .chart-card h3 {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-bottom: 10px;
-  }
-  .chart-wrap {
-    position: relative;
-    flex: 1;
-    min-height: 220px;
-  }
+/* ── Empty state ── */
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-dim); gap: 8px; font-size: 13px; min-height: 160px; }
+.empty-state .icon { font-size: 28px; opacity: 0.35; }
 
-  /* ── Cross-correlation matrix ── */
-  .matrix-wrap {
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    gap: 20px;
-    flex-wrap: wrap;
-  }
-  #matrixCanvas {
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    image-rendering: pixelated;
-  }
-  .matrix-legend {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
+/* ── Globe panel ── */
+.globe-panel { flex: 1; display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap; min-height: 0; }
+#globeCanvas { border-radius: 50%; border: 1px solid var(--border); background: #000; }
+.globe-legend { display: flex; flex-direction: column; gap: 8px; min-width: 160px; }
+.globe-legend h3 { font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+.legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.legend-arc { width: 24px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+.globe-pair-table { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
+.globe-pair-row { display: flex; align-items: center; gap: 6px; font-size: 11px; }
 
-  /* ── Empty state ── */
-  .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    flex: 1;
-    min-height: 200px;
-    color: var(--text-dim);
-    gap: 8px;
-    font-size: 13px;
-  }
-  .empty-state .icon { font-size: 32px; opacity: 0.35; }
+/* ── Matrix ── */
+.matrix-outer { display: flex; align-items: flex-start; justify-content: center; gap: 20px; flex-wrap: wrap; padding: 8px; }
 
-  /* ── Spinner overlay ── */
-  .spinner-overlay {
-    position: absolute;
-    inset: 0;
-    background: rgba(10,12,18,0.75);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    border-radius: 8px;
-    z-index: 10;
-  }
-  .spinner {
-    width: 32px; height: 32px;
-    border: 3px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .spinner-text { color: var(--text-dim); font-size: 12px; }
+/* ── Spinner ── */
+.spinner-overlay { position: absolute; inset: 0; background: rgba(10,12,18,0.78); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border-radius: 8px; z-index: 10; }
+.spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner-text { color: var(--text-dim); font-size: 11px; }
 
-  /* ── Frequency axis label ── */
-  .axis-info {
-    font-size: 10px;
-    color: var(--text-dim);
-    text-align: center;
-  }
+/* ── Status bar ── */
+.status-bar { background: var(--surface2); border-top: 1px solid var(--border); padding: 4px 18px; font-size: 11px; color: var(--text-dim); display: flex; align-items: center; gap: 10px; flex-shrink: 0; min-height: 24px; }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+.status-dot.ok { background: var(--success); }
+.status-dot.busy { background: var(--warn); animation: pulse 1s infinite; }
+.status-dot.err { background: var(--danger); }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+.refresh-countdown { margin-left: auto; color: var(--success); font-variant-numeric: tabular-nums; }
 
-  /* scrollbars */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: var(--bg); }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+/* ── Event badge ── */
+.event-badge { display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 </style>
 </head>
 <body>
 
-<!-- ══════════════ HEADER ══════════════ -->
+<!-- ══ HEADER ══ -->
 <div class="app-header">
-  <div>
-    <h1>🌐 Global Magnetometer Network Coherogram</h1>
-  </div>
-  <div class="subtitle">ULF Wave Detection · Windowed Cross-Coherence · NOAA SWPC</div>
-  <div class="header-sep"></div>
-  <div style="font-size:11px;color:var(--text-dim)">Pc3–Pc5 Band: 2–50 mHz</div>
+  <h1>🌐 Global Magnetometer Network Coherogram</h1>
+  <span class="sub">ULF Wave Detection · Windowed Cross-Coherence · NOAA SWPC</span>
+  <div class="hdr-sep"></div>
+  <span style="font-size:11px;color:var(--text-dim)">Pc3–Pc5 · 2–50 mHz</span>
 </div>
 
-<!-- ══════════════ TOOLBAR ══════════════ -->
+<!-- ══ TOOLBAR ══ -->
 <div class="toolbar">
-  <div class="toolbar-group">
-    <label>Data Source</label>
+  <div class="tg">
+    <label>Source</label>
     <select id="srcSelect">
-      <option value="swpc7d">SWPC Solar Wind (7-day)</option>
-      <option value="swpc1d">DSCOVR Solar Wind (1-day)</option>
-      <option value="goes">GOES-16 Magnetometer (1-day)</option>
-      <option value="synthetic">Synthetic (substorm simulation)</option>
+      <option value="swpc7d">SWPC Solar Wind 7-day</option>
+      <option value="swpc1d">DSCOVR Solar Wind 1-day</option>
+      <option value="goes">GOES-16 Magnetometer</option>
+      <option value="synthetic">Synthetic substorm</option>
     </select>
   </div>
-  <div class="toolbar-group">
-    <label>Slice Length</label>
+  <div class="tg">
+    <label>Slice</label>
     <input type="number" id="sliceLen" value="600" min="120" max="3600" step="60">
     <span style="color:var(--text-dim);font-size:11px">s</span>
   </div>
-  <div class="toolbar-group">
-    <label>Step Size</label>
+  <div class="tg">
+    <label>Step</label>
     <input type="number" id="stepSize" value="60" min="10" max="600" step="10">
     <span style="color:var(--text-dim);font-size:11px">s</span>
   </div>
-  <div class="toolbar-group">
-    <label>Max Freq</label>
+  <div class="tg">
+    <label>Max</label>
     <input type="number" id="maxFreq" value="50" min="5" max="100" step="5">
     <span style="color:var(--text-dim);font-size:11px">mHz</span>
   </div>
+  <div class="toolbar-sep"></div>
+  <label class="chk-label"><input type="checkbox" id="sigMaskChk"> Significance mask</label>
+  <div class="toolbar-sep"></div>
+  <button class="btn btn-secondary" id="autoRefreshBtn" onclick="toggleAutoRefresh()">⟳ Auto-refresh</button>
   <button class="btn btn-primary" id="runBtn" onclick="runAnalysis()">▶ Run Analysis</button>
 </div>
 
-<!-- ══════════════ STATION PILLS ══════════════ -->
+<!-- ══ STATION BAR ══ -->
 <div class="station-bar">
-  <span class="station-bar-label">Stations:</span>
-  <div id="stationPills"></div>
+  <span class="sbar-label">Stations:</span>
+  <div id="stationPills" style="display:flex;gap:5px;flex-wrap:wrap"></div>
 </div>
 
-<!-- ══════════════ METRICS ══════════════ -->
+<!-- ══ METRICS ══ -->
 <div class="metrics-bar">
-  <div class="metric-card">
-    <div class="metric-label">Samples</div>
-    <div><span class="metric-value" id="mSamples">—</span></div>
-  </div>
-  <div class="metric-card">
-    <div class="metric-label">Time Slices</div>
-    <div><span class="metric-value" id="mSlices">—</span></div>
-  </div>
-  <div class="metric-card">
-    <div class="metric-label">Station Pairs</div>
-    <div><span class="metric-value" id="mPairs">—</span></div>
-  </div>
-  <div class="metric-card">
-    <div class="metric-label">Peak ULF Freq</div>
-    <div><span class="metric-value" id="mPeakFreq">—</span><span class="metric-unit">mHz</span></div>
-  </div>
-  <div class="metric-card">
-    <div class="metric-label">Peak Coherence</div>
-    <div><span class="metric-value" id="mPeakCoh">—</span></div>
-  </div>
+  <div class="mc"><div class="mc-label">Samples</div><span class="mc-value" id="mSamples">—</span></div>
+  <div class="mc"><div class="mc-label">Time Slices</div><span class="mc-value" id="mSlices">—</span></div>
+  <div class="mc"><div class="mc-label">Station Pairs</div><span class="mc-value" id="mPairs">—</span></div>
+  <div class="mc"><div class="mc-label">Peak ULF</div><span class="mc-value" id="mPeakFreq">—</span><span class="mc-unit">mHz</span></div>
+  <div class="mc"><div class="mc-label">Peak γ²</div><span class="mc-value" id="mPeakCoh">—</span></div>
+  <div class="mc"><div class="mc-label">Sig. Threshold</div><span class="mc-value" id="mSigThresh">—</span></div>
+  <div class="mc"><div class="mc-label">Events</div><span class="mc-value" id="mEvents">—</span></div>
 </div>
 
-<!-- ══════════════ MAIN CONTENT ══════════════ -->
+<!-- ══ MAIN ══ -->
 <div class="main-content">
   <div class="tab-bar">
-    <div class="tab active" onclick="switchTab(0)">🔥 Network Coherogram</div>
-    <div class="tab" onclick="switchTab(1)">📈 Raw Time Series</div>
-    <div class="tab" onclick="switchTab(2)">〜 FFT Power Spectra</div>
-    <div class="tab" onclick="switchTab(3)">⊞ Cross-Correlation Matrix</div>
+    <div class="tab active" onclick="switchTab(0)">🔥 Coherogram</div>
+    <div class="tab" onclick="switchTab(1)">📈 Time Series</div>
+    <div class="tab" onclick="switchTab(2)">〜 FFT Spectra</div>
+    <div class="tab" onclick="switchTab(3)">⊞ Correlation Matrix</div>
+    <div class="tab" onclick="switchTab(4)">🌍 Station Globe</div>
   </div>
 
   <div class="panels">
     <!-- Panel 0: Coherogram -->
     <div class="panel active" id="panel0">
-      <div class="coherogram-container">
-        <div class="coherogram-wrap" id="coherogramWrap">
-          <canvas id="coherogramCanvas"></canvas>
-          <div class="coherogram-placeholder" id="cohPlaceholder">
-            <div class="big-icon">🌊</div>
-            <div>Press <strong>Run Analysis</strong> to compute the network coherogram</div>
-            <div style="font-size:11px">Fetches NOAA SWPC data · Computes windowed Welch cross-coherence · Renders inferno heatmap</div>
-          </div>
+      <div class="coh-wrap" id="cohWrap">
+        <canvas id="coherogramCanvas"></canvas>
+        <div class="coh-placeholder" id="cohPlaceholder">
+          <div class="bi">🌊</div>
+          <div>Press <strong>Run Analysis</strong> to compute the network coherogram</div>
+          <div style="font-size:11px;opacity:0.7">Windowed Welch cross-coherence · Inferno heatmap · Click to inspect windows</div>
         </div>
-        <div>
-          <div class="colorbar-wrap">
-            <span class="colorbar-label">Coherence γ²</span>
-            <canvas id="colorbarCanvas" height="18"></canvas>
-          </div>
-          <div class="colorbar-ticks" id="colorbarTicks">
-            <span>0.0</span><span>0.25</span><span>0.5</span><span>0.75</span><span>1.0</span>
-          </div>
-          <div class="axis-info">X: Time → &nbsp;|&nbsp; Y: Frequency (0 – <span id="maxFreqLabel">50</span> mHz, low→high)</div>
+        <div class="coh-tooltip" id="cohTooltip"></div>
+      </div>
+      <div>
+        <div class="colorbar-row">
+          <span class="cb-label">γ²</span>
+          <canvas id="colorbarCanvas" height="16"></canvas>
+          <span id="sigThreshLine" style="font-size:10px;color:var(--warn);white-space:nowrap;display:none">▲ p&lt;0.05</span>
+        </div>
+        <div class="cb-ticks"><span>0</span><span>0.25</span><span>0.5</span><span>0.75</span><span>1</span></div>
+        <div class="axis-info">← Time (minutes) &nbsp;|&nbsp; ↑ Frequency (0–<span id="maxFreqLabel">50</span> mHz) &nbsp;|&nbsp; Click any cell to inspect</div>
+      </div>
+      <!-- Detail panel -->
+      <div class="detail-panel" id="detailPanel">
+        <div class="detail-header">
+          <div class="detail-title" id="detailTitle">Window detail</div>
+          <button class="detail-close" onclick="closeDetail()">✕</button>
+        </div>
+        <div class="detail-body">
+          <div class="detail-chart-wrap"><canvas id="detailCanvas"></canvas></div>
+          <div class="detail-pairs" id="detailPairs"></div>
         </div>
       </div>
     </div>
 
-    <!-- Panel 1: Raw Time Series -->
+    <!-- Panel 1: Time Series -->
     <div class="panel" id="panel1">
-      <div class="chart-card" style="flex:1;min-height:0;display:flex;flex-direction:column;">
-        <h3>First-Differenced Bz (nT/s) — per Station</h3>
-        <div class="chart-wrap" style="flex:1;">
+      <div class="chart-card">
+        <h3>First-Differenced Bz (nT/s) per Station</h3>
+        <div class="chart-wrap">
           <canvas id="tsCanvas"></canvas>
-          <div class="empty-state" id="tsEmpty">
-            <div class="icon">📈</div>
-            <div>Run analysis to view time series</div>
-          </div>
+          <div class="empty-state" id="tsEmpty"><div class="icon">📈</div><div>Run analysis first</div></div>
         </div>
       </div>
     </div>
 
-    <!-- Panel 2: FFT Power Spectra -->
+    <!-- Panel 2: FFT -->
     <div class="panel" id="panel2">
-      <div class="chart-card" style="flex:1;min-height:0;display:flex;flex-direction:column;">
-        <h3>FFT Power Spectral Density (log₁₀) — per Station</h3>
-        <div class="chart-wrap" style="flex:1;">
+      <div class="chart-card">
+        <h3>FFT Power Spectral Density log₁₀ per Station</h3>
+        <div class="chart-wrap">
           <canvas id="fftCanvas"></canvas>
-          <div class="empty-state" id="fftEmpty">
-            <div class="icon">〜</div>
-            <div>Run analysis to view power spectra</div>
-          </div>
+          <div class="empty-state" id="fftEmpty"><div class="icon">〜</div><div>Run analysis first</div></div>
         </div>
       </div>
     </div>
 
-    <!-- Panel 3: Cross-Correlation Matrix -->
+    <!-- Panel 3: Matrix -->
     <div class="panel" id="panel3">
       <div class="chart-card">
-        <h3>Mean Network Cross-Coherence Matrix</h3>
-        <div class="matrix-wrap" id="matrixWrap">
-          <div class="empty-state" id="matrixEmpty" style="min-height:200px;">
-            <div class="icon">⊞</div>
-            <div>Run analysis to view correlation matrix</div>
-          </div>
+        <h3>Mean Network Cross-Coherence γ² Matrix</h3>
+        <div class="matrix-outer" id="matrixWrap">
+          <div class="empty-state" id="matrixEmpty"><div class="icon">⊞</div><div>Run analysis first</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel 4: Globe -->
+    <div class="panel" id="panel4">
+      <div class="globe-panel">
+        <canvas id="globeCanvas" width="360" height="360"></canvas>
+        <div class="globe-legend">
+          <h3>Station Network</h3>
+          <div id="globeStationLegend"></div>
+          <h3 style="margin-top:12px">Pair Coherence</h3>
+          <div id="globePairLegend"></div>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ══════════════ STATUS BAR ══════════════ -->
+<!-- ══ STATUS ══ -->
 <div class="status-bar">
   <div class="status-dot" id="statusDot"></div>
   <span id="statusText">Ready — select a data source and press Run Analysis</span>
+  <span class="refresh-countdown" id="refreshCountdown"></span>
 </div>
 
 <script>
 'use strict';
 
 // ═══════════════════════════════════════════════════════════
-//  STATION CONFIGURATION
+//  STATION CONFIG
 // ═══════════════════════════════════════════════════════════
 const STATIONS = [
-  { id: 'BOU', name: 'Boulder CO',       phaseOffset: 0.0,  ampScale: 1.00, color: '#4f9cf9' },
-  { id: 'FRD', name: 'Fredericksburg VA', phaseOffset: 0.15, ampScale: 0.92, color: '#f97b4f' },
-  { id: 'COL', name: 'College AK',        phaseOffset: 0.31, ampScale: 1.08, color: '#3ecf8e' },
-  { id: 'SIT', name: 'Sitka AK',          phaseOffset: 0.22, ampScale: 0.97, color: '#f9cf4f' },
-  { id: 'TUC', name: 'Tucson AZ',         phaseOffset: 0.09, ampScale: 0.85, color: '#cf4ff9' },
-  { id: 'HON', name: 'Honolulu HI',       phaseOffset: 0.44, ampScale: 0.78, color: '#f94fa8' },
+  { id:'BOU', name:'Boulder CO',        lat:40.14, lon:-105.24, phaseOffset:0.00, ampScale:1.00, color:'#4f9cf9' },
+  { id:'FRD', name:'Fredericksburg VA', lat:38.20, lon:-77.37,  phaseOffset:0.15, ampScale:0.92, color:'#f97b4f' },
+  { id:'COL', name:'College AK',        lat:64.87, lon:-147.85, phaseOffset:0.31, ampScale:1.08, color:'#3ecf8e' },
+  { id:'SIT', name:'Sitka AK',          lat:57.06, lon:-135.33, phaseOffset:0.22, ampScale:0.97, color:'#f9cf4f' },
+  { id:'TUC', name:'Tucson AZ',         lat:32.17, lon:-110.88, phaseOffset:0.09, ampScale:0.85, color:'#cf4ff9' },
+  { id:'HON', name:'Honolulu HI',       lat:21.32, lon:-157.94, phaseOffset:0.44, ampScale:0.78, color:'#f94fa8' },
 ];
 let activeStations = new Set(STATIONS.map(s => s.id));
-
-// ═══════════════════════════════════════════════════════════
-//  STATION PILLS UI
-// ═══════════════════════════════════════════════════════════
-function buildStationPills() {
-  const container = document.getElementById('stationPills');
-  container.style.display = 'flex';
-  container.style.gap = '6px';
-  container.style.flexWrap = 'wrap';
-  STATIONS.forEach(s => {
-    const pill = document.createElement('div');
-    pill.className = 'station-pill active';
-    pill.textContent = `${s.id} · ${s.name}`;
-    pill.style.borderColor = s.color;
-    pill.style.backgroundColor = s.color + '33';
-    pill.style.color = s.color;
-    pill.dataset.id = s.id;
-    pill.addEventListener('click', () => {
-      const isActive = activeStations.has(s.id);
-      if (isActive && activeStations.size <= 2) {
-        setStatus('warn', 'Minimum 2 stations required');
-        return;
-      }
-      if (isActive) {
-        activeStations.delete(s.id);
-        pill.className = 'station-pill';
-        pill.style.backgroundColor = '';
-        pill.style.color = s.color + '99';
-      } else {
-        activeStations.add(s.id);
-        pill.className = 'station-pill active';
-        pill.style.backgroundColor = s.color + '33';
-        pill.style.color = s.color;
-      }
-    });
-    container.appendChild(pill);
-  });
-}
-
-// ═══════════════════════════════════════════════════════════
-//  TAB SWITCHING
-// ═══════════════════════════════════════════════════════════
-let currentTab = 0;
-function switchTab(i) {
-  document.querySelectorAll('.tab').forEach((t, j) => {
-    t.classList.toggle('active', i === j);
-  });
-  document.querySelectorAll('.panel').forEach((p, j) => {
-    p.classList.toggle('active', i === j);
-  });
-  currentTab = i;
-}
-
-// ═══════════════════════════════════════════════════════════
-//  STATUS HELPERS
-// ═══════════════════════════════════════════════════════════
-function setStatus(state, msg) {
-  const dot = document.getElementById('statusDot');
-  dot.className = 'status-dot ' + (state === 'ok' ? 'ok' : state === 'busy' ? 'busy' : state === 'err' ? 'err' : '');
-  document.getElementById('statusText').textContent = msg;
-}
-function setMetric(id, val, digits=0) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = (val === null || val === undefined) ? '—' : (typeof val === 'number' ? val.toFixed(digits) : val);
-}
 
 // ═══════════════════════════════════════════════════════════
 //  INFERNO COLORMAP
 // ═══════════════════════════════════════════════════════════
 function infernoRGB(t) {
   t = Math.max(0, Math.min(1, t));
-  const r = Math.round(255 * (0.001 + t * (0.8 * (1 - Math.exp(-5 * t)) + 0.8 * t * t)));
-  let g, b;
-  if (t < 0.5) {
-    g = Math.round(255 * (0.05 + t * 0.4));
-  } else {
-    g = Math.round(255 * (0.25 + (t - 0.5) * 2 * 0.65));
-  }
-  if (t < 0.3) {
-    b = Math.round(255 * (0.5 * t / 0.3));
-  } else if (t < 0.7) {
-    b = Math.round(255 * (0.5 * (1 - (t - 0.3) / 0.4)));
-  } else {
-    b = Math.round(255 * 0.02);
-  }
-  return [
-    Math.max(0, Math.min(255, r)),
-    Math.max(0, Math.min(255, g)),
-    Math.max(0, Math.min(255, b))
-  ];
-}
-
-function drawColorbar() {
-  const canvas = document.getElementById('colorbarCanvas');
-  const W = canvas.offsetWidth || 400;
-  canvas.width = W;
-  canvas.height = 18;
-  const ctx = canvas.getContext('2d');
-  for (let x = 0; x < W; x++) {
-    const [r, g, b] = infernoRGB(x / (W - 1));
-    ctx.fillStyle = `rgb(${r},${g},${b})`;
-    ctx.fillRect(x, 0, 1, 18);
-  }
+  const r = 255*(0.001 + t*(0.8*(1-Math.exp(-5*t)) + 0.8*t*t));
+  const g = t < 0.5 ? 255*(0.05+t*0.4) : 255*(0.25+(t-0.5)*2*0.65);
+  const b = t < 0.3 ? 255*(0.5*t/0.3) : t < 0.7 ? 255*(0.5*(1-(t-0.3)/0.4)) : 255*0.02;
+  return [Math.max(0,Math.min(255,Math.round(r))), Math.max(0,Math.min(255,Math.round(g))), Math.max(0,Math.min(255,Math.round(b)))];
 }
 
 // ═══════════════════════════════════════════════════════════
-//  COOLEY-TUKEY RADIX-2 FFT (in-place, complex interleaved)
+//  COOLEY-TUKEY FFT
 // ═══════════════════════════════════════════════════════════
 function fft(re, im) {
   const N = re.length;
-  // bit-reversal permutation
   let j = 0;
   for (let i = 1; i < N; i++) {
     let bit = N >> 1;
     for (; j & bit; bit >>= 1) j ^= bit;
     j ^= bit;
-    if (i < j) {
-      [re[i], re[j]] = [re[j], re[i]];
-      [im[i], im[j]] = [im[j], im[i]];
-    }
+    if (i < j) { [re[i],re[j]]=[re[j],re[i]]; [im[i],im[j]]=[im[j],im[i]]; }
   }
-  // Cooley-Tukey butterfly
   for (let len = 2; len <= N; len <<= 1) {
-    const ang = -2 * Math.PI / len;
-    const wRe = Math.cos(ang), wIm = Math.sin(ang);
+    const ang = -2*Math.PI/len, wRe = Math.cos(ang), wIm = Math.sin(ang);
     for (let i = 0; i < N; i += len) {
-      let curRe = 1, curIm = 0;
-      for (let k = 0; k < len / 2; k++) {
-        const uRe = re[i + k], uIm = im[i + k];
-        const vRe = re[i + k + len/2] * curRe - im[i + k + len/2] * curIm;
-        const vIm = re[i + k + len/2] * curIm + im[i + k + len/2] * curRe;
-        re[i + k] = uRe + vRe;
-        im[i + k] = uIm + vIm;
-        re[i + k + len/2] = uRe - vRe;
-        im[i + k + len/2] = uIm - vIm;
-        const tmpRe = curRe * wRe - curIm * wIm;
-        curIm = curRe * wIm + curIm * wRe;
-        curRe = tmpRe;
+      let cRe = 1, cIm = 0;
+      for (let k = 0; k < len/2; k++) {
+        const uRe=re[i+k], uIm=im[i+k];
+        const vRe=re[i+k+len/2]*cRe - im[i+k+len/2]*cIm;
+        const vIm=re[i+k+len/2]*cIm + im[i+k+len/2]*cRe;
+        re[i+k]=uRe+vRe; im[i+k]=uIm+vIm;
+        re[i+k+len/2]=uRe-vRe; im[i+k+len/2]=uIm-vIm;
+        const tmp=cRe*wRe-cIm*wIm; cIm=cRe*wIm+cIm*wRe; cRe=tmp;
       }
     }
   }
 }
-
-function nextPow2(n) {
-  let p = 1;
-  while (p < n) p <<= 1;
-  return p;
-}
+function nextPow2(n) { let p=1; while(p<n) p<<=1; return p; }
 
 // ═══════════════════════════════════════════════════════════
 //  WELCH COHERENCE
-//  Returns { freqs[], coherence[] } for a pair of signals
-//  using nperseg-length Hann-windowed segments with 50% overlap
 // ═══════════════════════════════════════════════════════════
 function welchCoherence(x, y, fs, nperseg) {
-  const N = nperseg;
-  const step = N >> 1;  // 50% overlap
-  const nfft = nextPow2(N);
-  const halfN = (nfft >> 1) + 1;
-
-  // Hann window
+  const N = nperseg, step = N>>1, nfft = nextPow2(N), half = (nfft>>1)+1;
   const win = new Float64Array(N);
-  for (let i = 0; i < N; i++) win[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (N - 1)));
-  const winNorm = win.reduce((a, v) => a + v * v, 0);
-
-  // accumulators
-  const Pxx = new Float64Array(halfN);
-  const Pyy = new Float64Array(halfN);
-  const PxyRe = new Float64Array(halfN);
-  const PxyIm = new Float64Array(halfN);
-  let nSeg = 0;
-
-  for (let start = 0; start + N <= x.length; start += step) {
-    const reX = new Float64Array(nfft);
-    const imX = new Float64Array(nfft);
-    const reY = new Float64Array(nfft);
-    const imY = new Float64Array(nfft);
-    for (let i = 0; i < N; i++) {
-      reX[i] = x[start + i] * win[i];
-      reY[i] = y[start + i] * win[i];
-    }
-    fft(reX, imX);
-    fft(reY, imY);
-    for (let k = 0; k < halfN; k++) {
-      Pxx[k] += reX[k]*reX[k] + imX[k]*imX[k];
-      Pyy[k] += reY[k]*reY[k] + imY[k]*imY[k];
-      PxyRe[k] += reX[k]*reY[k] + imX[k]*imY[k];  // Re(X * conj(Y)) = Xr*Yr + Xi*Yi
-      PxyIm[k] += imX[k]*reY[k] - reX[k]*imY[k];  // Im(X * conj(Y))
+  for (let i=0;i<N;i++) win[i]=0.5*(1-Math.cos(2*Math.PI*i/(N-1)));
+  const Pxx=new Float64Array(half), Pyy=new Float64Array(half);
+  const PxyRe=new Float64Array(half), PxyIm=new Float64Array(half);
+  let nSeg=0;
+  for (let s=0; s+N<=x.length; s+=step) {
+    const rX=new Float64Array(nfft),iX=new Float64Array(nfft);
+    const rY=new Float64Array(nfft),iY=new Float64Array(nfft);
+    for (let i=0;i<N;i++){rX[i]=x[s+i]*win[i]; rY[i]=y[s+i]*win[i];}
+    fft(rX,iX); fft(rY,iY);
+    for (let k=0;k<half;k++){
+      Pxx[k]+=rX[k]*rX[k]+iX[k]*iX[k];
+      Pyy[k]+=rY[k]*rY[k]+iY[k]*iY[k];
+      PxyRe[k]+=rX[k]*rY[k]+iX[k]*iY[k];
+      PxyIm[k]+=iX[k]*rY[k]-rX[k]*iY[k];
     }
     nSeg++;
   }
-
-  if (nSeg === 0) return null;
-
-  const coherence = new Float64Array(halfN);
-  const freqs = new Float64Array(halfN);
-  for (let k = 0; k < halfN; k++) {
-    freqs[k] = k * fs / nfft;
-    const num = PxyRe[k]*PxyRe[k] + PxyIm[k]*PxyIm[k];
-    const den = Pxx[k] * Pyy[k];
-    coherence[k] = den > 1e-30 ? Math.min(1, num / den) : 0;
+  if (!nSeg) return null;
+  const coherence=new Float64Array(half), freqs=new Float64Array(half);
+  for (let k=0;k<half;k++){
+    freqs[k]=k*fs/nfft;
+    const num=PxyRe[k]*PxyRe[k]+PxyIm[k]*PxyIm[k];
+    const den=Pxx[k]*Pyy[k];
+    coherence[k]=den>1e-30?Math.min(1,num/den):0;
   }
-  return { freqs, coherence };
+  return {freqs, coherence, nSeg};
 }
 
 // ═══════════════════════════════════════════════════════════
-//  SYNTHETIC SUBSTORM SIMULATION
+//  SYNTHETIC SUBSTORM
 // ═══════════════════════════════════════════════════════════
-function generateSynthetic(nSamples, fs, station) {
-  const t = new Float64Array(nSamples);
-  for (let i = 0; i < nSamples; i++) t[i] = i / fs;
+function mulberry32(a){ return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}; }
 
-  const signal = new Float64Array(nSamples);
-  const rng = mulberry32(station.id.charCodeAt(0) * 1234567);
-
-  // Background noise
-  for (let i = 0; i < nSamples; i++) signal[i] = (rng() - 0.5) * 2;
-
-  // Pc5 wave (2-7 mHz) — onset at t=1800s
-  const pc5Freq = 0.005; // 5 mHz
-  const pc5Phase = station.phaseOffset * 2 * Math.PI * pc5Freq * 200;
-  for (let i = 0; i < nSamples; i++) {
-    if (t[i] > 1800) {
-      const env = Math.min(1, (t[i] - 1800) / 600);
-      signal[i] += station.ampScale * env * 8 * Math.sin(2 * Math.PI * pc5Freq * t[i] + pc5Phase);
-    }
+function generateSynthetic(n, fs, s) {
+  const sig=new Float64Array(n), rng=mulberry32(s.id.charCodeAt(0)*1234567);
+  for (let i=0;i<n;i++) sig[i]=(rng()-0.5)*2;
+  const t=i=>i/fs;
+  const pc5=0.005, ph5=s.phaseOffset*2*Math.PI*pc5*200;
+  const pc4=0.012, ph4=s.phaseOffset*2*Math.PI*pc4*150;
+  const pc3=0.033, ph3=s.phaseOffset*2*Math.PI*pc3*80;
+  for (let i=0;i<n;i++){
+    const ti=t(i);
+    if(ti>1800) sig[i]+=s.ampScale*Math.min(1,(ti-1800)/600)*8*Math.sin(2*Math.PI*pc5*ti+ph5);
+    sig[i]+=s.ampScale*3*Math.sin(2*Math.PI*pc4*ti+ph4);
+    if(ti>3600&&ti<5400) sig[i]+=s.ampScale*Math.sin(Math.PI*(ti-3600)/1800)*5*Math.sin(2*Math.PI*pc3*ti+ph3);
+    if(ti>2700) sig[i]+=s.ampScale*25*Math.exp(-(ti-2700)/300)*Math.sin(2*Math.PI*0.008*ti);
   }
-
-  // Pc4 wave (7-22 mHz) — throughout
-  const pc4Freq = 0.012;
-  const pc4Phase = station.phaseOffset * 2 * Math.PI * pc4Freq * 150;
-  for (let i = 0; i < nSamples; i++) {
-    signal[i] += station.ampScale * 3 * Math.sin(2 * Math.PI * pc4Freq * t[i] + pc4Phase);
-  }
-
-  // Pc3 wave (22-100 mHz) — burst at t=3600s
-  const pc3Freq = 0.033;
-  const pc3Phase = station.phaseOffset * 2 * Math.PI * pc3Freq * 80;
-  for (let i = 0; i < nSamples; i++) {
-    if (t[i] > 3600 && t[i] < 5400) {
-      const env = Math.sin(Math.PI * (t[i] - 3600) / 1800);
-      signal[i] += station.ampScale * env * 5 * Math.sin(2 * Math.PI * pc3Freq * t[i] + pc3Phase);
-    }
-  }
-
-  // Substorm dipolarization at t=2700s
-  for (let i = 0; i < nSamples; i++) {
-    if (t[i] > 2700) {
-      const dt = t[i] - 2700;
-      signal[i] += station.ampScale * 25 * Math.exp(-dt / 300) * Math.sin(2 * Math.PI * 0.008 * t[i]);
-    }
-  }
-
-  return signal;
-}
-
-function mulberry32(a) {
-  return function() {
-    a |= 0; a = a + 0x6D2B79F5 | 0;
-    let t = Math.imul(a ^ a >>> 15, 1 | a);
-    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
-  };
+  return sig;
 }
 
 // ═══════════════════════════════════════════════════════════
 //  NOAA DATA FETCH
 // ═══════════════════════════════════════════════════════════
 const URLS = {
-  swpc7d: 'https://services.swpc.noaa.gov/products/solar-wind/mag-7-day.json',
-  swpc1d: 'https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json',
-  goes:   'https://services.swpc.noaa.gov/json/goes/primary/magnetics-1-day.json',
+  swpc7d:'https://services.swpc.noaa.gov/products/solar-wind/mag-7-day.json',
+  swpc1d:'https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json',
+  goes:  'https://services.swpc.noaa.gov/json/goes/primary/magnetics-1-day.json',
 };
-
 async function fetchBaseSignal(src) {
-  if (src === 'synthetic') return null;
+  if (src==='synthetic') return null;
   try {
-    setStatus('busy', `Fetching NOAA SWPC data (${src})…`);
-    const resp = await fetch(URLS[src]);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const raw = await resp.json();
-
-    let bz = [];
-    if (src === 'goes') {
-      bz = raw.map(r => parseFloat(r.Hp)).filter(v => isFinite(v));
-    } else {
-      const header = raw[0];
-      const bzIdx = 3;
-      for (let i = 1; i < raw.length; i++) {
-        const v = parseFloat(raw[i][bzIdx]);
-        if (isFinite(v)) bz.push(v);
-      }
-    }
-    if (bz.length < 128) throw new Error('Insufficient data');
+    setStatus('busy',`Fetching NOAA SWPC (${src})…`);
+    const resp=await fetch(URLS[src]); if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const raw=await resp.json();
+    let bz=[];
+    if(src==='goes') bz=raw.map(r=>parseFloat(r.Hp)).filter(isFinite);
+    else { for(let i=1;i<raw.length;i++){const v=parseFloat(raw[i][3]);if(isFinite(v))bz.push(v);} }
+    if(bz.length<128) throw new Error('Insufficient data');
     return new Float64Array(bz);
-  } catch (e) {
-    setStatus('warn', `NOAA fetch failed (${e.message}) — using synthetic fallback`);
-    return null;
-  }
+  } catch(e) { setStatus('warn',`NOAA fetch failed (${e.message}) — synthetic fallback`); return null; }
 }
 
-// ═══════════════════════════════════════════════════════════
-//  FIRST DIFFERENCE
-// ═══════════════════════════════════════════════════════════
 function firstDifference(sig) {
-  const out = new Float64Array(sig.length - 1);
-  for (let i = 0; i < out.length; i++) out[i] = sig[i + 1] - sig[i];
+  const out=new Float64Array(sig.length-1);
+  for(let i=0;i<out.length;i++) out[i]=sig[i+1]-sig[i];
   return out;
 }
 
 // ═══════════════════════════════════════════════════════════
-//  MAIN ANALYSIS PIPELINE
+//  EVENT DETECTION
 // ═══════════════════════════════════════════════════════════
-let lastResult = null;
-let tsChart = null, fftChart = null;
+function detectEvents(coherogramData, ulfFreqs, times, sigThreshold) {
+  const nT=coherogramData.length, nF=ulfFreqs.length;
+  const meanCoh=new Float64Array(nT);
+  for(let ti=0;ti<nT;ti++){
+    let s=0; for(let fi=0;fi<nF;fi++) s+=coherogramData[ti][fi]; meanCoh[ti]=s/nF;
+  }
+  let mu=0; for(let ti=0;ti<nT;ti++) mu+=meanCoh[ti]; mu/=nT;
+  let sd=0; for(let ti=0;ti<nT;ti++) sd+=(meanCoh[ti]-mu)**2; sd=Math.sqrt(sd/nT);
+  const threshold=Math.max(sigThreshold*1.1, mu+1.5*sd, 0.35);
 
+  const events=[];
+  let inEv=false, evStart=0;
+  for(let ti=0;ti<=nT;ti++){
+    const above=ti<nT && meanCoh[ti]>threshold;
+    if(above&&!inEv){inEv=true;evStart=ti;}
+    if(!above&&inEv){
+      inEv=false; const evEnd=ti-1;
+      if(evEnd-evStart>=1){
+        let maxC=0,pkF=0;
+        for(let t=evStart;t<=evEnd;t++) for(let fi=0;fi<nF;fi++) if(coherogramData[t][fi]>maxC){maxC=coherogramData[t][fi];pkF=ulfFreqs[fi]*1000;}
+        const band=pkF<7?'Pc5':pkF<22?'Pc4':'Pc3';
+        const bandColor=pkF<7?'#4f9cf9':pkF<22?'#f9cf4f':'#f97b4f';
+        events.push({startTi:evStart,endTi:evEnd,peakCoh:maxC,peakFreqMHz:pkF,band,bandColor,
+          meanCoh:Array.from(meanCoh.slice(evStart,evEnd+1)).reduce((a,b)=>a+b,0)/(evEnd-evStart+1)});
+      }
+    }
+  }
+  return {events, threshold, meanCoh};
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SIGNIFICANCE THRESHOLD
+// ═══════════════════════════════════════════════════════════
+function computeSigThreshold(sliceLen, nperseg, alpha=0.05) {
+  const K=Math.max(2, Math.floor((sliceLen-nperseg)/(nperseg>>1))+1);
+  return 1-Math.pow(alpha, 1/(K-1));
+}
+
+// ═══════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════
+let lastResult=null, currentTab=0;
+let tsChart=null, fftChart=null, detailChart=null;
+let globeAnimId=null;
+let autoRefreshInterval=null, autoRefreshSeconds=0, autoRefreshActive=false;
+
+function freshCanvas(id) {
+  const old=document.getElementById(id);
+  const fresh=document.createElement('canvas');
+  fresh.id=id;
+  old.parentNode.replaceChild(fresh,old);
+  return fresh;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  MAIN ANALYSIS
+// ═══════════════════════════════════════════════════════════
 async function runAnalysis() {
-  const btn = document.getElementById('runBtn');
-  btn.disabled = true;
+  const btn=document.getElementById('runBtn');
+  btn.disabled=true;
+  closeDetail();
 
-  const sliceLen = Math.max(120, Math.min(3600, parseInt(document.getElementById('sliceLen').value) || 600));
-  const stepSize = Math.max(10, Math.min(600, parseInt(document.getElementById('stepSize').value) || 60));
-  const maxFreqHz = Math.max(0.005, Math.min(0.1, (parseFloat(document.getElementById('maxFreq').value) || 50) / 1000));
-  const src = document.getElementById('srcSelect').value;
-  const nperseg = 128;
-  const fs = 1; // 1 Hz sample rate
+  const sliceLen=Math.max(120,Math.min(3600,parseInt(document.getElementById('sliceLen').value)||600));
+  const stepSize=Math.max(10, Math.min(600, parseInt(document.getElementById('stepSize').value)||60));
+  const maxFreqHz=Math.max(0.005,Math.min(0.1,(parseFloat(document.getElementById('maxFreq').value)||50)/1000));
+  const src=document.getElementById('srcSelect').value;
+  const nperseg=128, fs=1;
+  document.getElementById('maxFreqLabel').textContent=Math.round(maxFreqHz*1000);
 
-  document.getElementById('maxFreqLabel').textContent = Math.round(maxFreqHz * 1000);
-
-  // Show spinner on coherogram
-  const wrap = document.getElementById('coherogramWrap');
-  let spinner = document.createElement('div');
-  spinner.className = 'spinner-overlay';
-  spinner.innerHTML = `<div class="spinner"></div><div class="spinner-text" id="spinnerMsg">Fetching data…</div>`;
+  // Clear old spinners
+  const wrap=document.getElementById('cohWrap');
+  wrap.querySelectorAll('.spinner-overlay').forEach(e=>e.remove());
+  const spinner=document.createElement('div');
+  spinner.className='spinner-overlay';
+  spinner.innerHTML=`<div class="spinner"></div><div class="spinner-text" id="spinnerMsg">Fetching data…</div>`;
   wrap.appendChild(spinner);
-  document.getElementById('cohPlaceholder').style.display = 'none';
+  document.getElementById('cohPlaceholder').style.display='none';
+  const spin=msg=>{const el=document.getElementById('spinnerMsg');if(el)el.textContent=msg;setStatus('busy',msg);};
 
-  const updateSpinner = msg => {
-    const el = document.getElementById('spinnerMsg');
-    if (el) el.textContent = msg;
-    setStatus('busy', msg);
-  };
-
-  await new Promise(r => setTimeout(r, 10)); // allow repaint
-
+  await tick();
   try {
-    // 1. Fetch / generate base signal
-    let baseSignal = await fetchBaseSignal(src);
-    const useSynthetic = !baseSignal;
+    // 1. Data
+    let base=await fetchBaseSignal(src);
+    const useSynth=!base;
+    const activeList=STATIONS.filter(s=>activeStations.has(s.id));
+    const nPairs=activeList.length*(activeList.length-1)/2;
 
-    // Active station objects
-    const activeList = STATIONS.filter(s => activeStations.has(s.id));
-    const nPairs = activeList.length * (activeList.length - 1) / 2;
-
-    // 2. Build per-station signals
-    updateSpinner('Generating station signals…');
-    await new Promise(r => setTimeout(r, 10));
-
-    const N_SYNTH = 7200;
-    const stationSignals = {};
-    for (const s of activeList) {
-      if (useSynthetic) {
-        stationSignals[s.id] = generateSynthetic(N_SYNTH, fs, s);
-      } else {
-        // Apply inter-station amplitude scaling and phase shift via FIR-like delay
-        const base = baseSignal;
-        const shifted = new Float64Array(base.length);
-        const delayBins = Math.round(s.phaseOffset * fs * 10); // up to ~4.4s delay
-        for (let i = 0; i < base.length; i++) {
-          shifted[i] = base[Math.max(0, i - delayBins)] * s.ampScale + (Math.random() - 0.5) * 0.3;
-        }
-        stationSignals[s.id] = shifted;
+    // 2. Station signals
+    spin('Generating station signals…'); await tick();
+    const N_SYNTH=7200;
+    const stationSigs={};
+    for(const s of activeList){
+      if(useSynth){ stationSigs[s.id]=generateSynthetic(N_SYNTH,fs,s); }
+      else{
+        let rms=0; for(let i=0;i<base.length;i++) rms+=base[i]*base[i];
+        rms=Math.sqrt(rms/base.length)||1;
+        const noiseAmp=rms*0.45;
+        const delay=Math.round(30+s.phaseOffset*(270-30)/0.44);
+        const rng=mulberry32(s.id.charCodeAt(0)*9999991+7);
+        const sig=new Float64Array(base.length);
+        for(let i=0;i<base.length;i++) sig[i]=base[Math.max(0,i-delay)]*s.ampScale+(rng()-0.5)*2*noiseAmp;
+        stationSigs[s.id]=sig;
       }
     }
 
-    // 3. First-difference each signal
-    const diffSignals = {};
-    for (const s of activeList) {
-      diffSignals[s.id] = firstDifference(stationSignals[s.id]);
-    }
-
-    const nSamples = diffSignals[activeList[0].id].length;
-    setMetric('mSamples', nSamples);
+    // 3. First-difference
+    const diffSigs={};
+    for(const s of activeList) diffSigs[s.id]=firstDifference(stationSigs[s.id]);
+    const nSamples=diffSigs[activeList[0].id].length;
+    setMetric('mSamples',nSamples);
 
     // 4. Sliding window coherogram
-    updateSpinner('Computing windowed cross-coherence…');
-    await new Promise(r => setTimeout(r, 10));
+    spin('Computing windowed cross-coherence…'); await tick();
+    const sliceSamples=Math.min(sliceLen,nSamples);
+    const stepSamples=Math.min(stepSize,sliceSamples);
+    const sigThreshold=computeSigThreshold(sliceLen,nperseg);
 
-    const sliceSamples = Math.min(sliceLen, nSamples);
-    const stepSamples = Math.min(stepSize, sliceSamples);
+    // Freq grid
+    const testRes=welchCoherence(diffSigs[activeList[0].id].slice(0,sliceSamples),diffSigs[activeList[1].id].slice(0,sliceSamples),fs,nperseg);
+    if(!testRes) throw new Error('Signal too short for coherence');
+    const allFreqs=testRes.freqs;
+    const ulfMask=[]; for(let k=0;k<allFreqs.length;k++) if(allFreqs[k]<=maxFreqHz) ulfMask.push(k);
+    const ulfFreqs=ulfMask.map(k=>allFreqs[k]);
+    const nULF=ulfFreqs.length;
 
-    // Compute frequency grid from welch on first window
-    const testCoh = welchCoherence(
-      diffSignals[activeList[0].id].slice(0, sliceSamples),
-      diffSignals[activeList[1].id].slice(0, sliceSamples),
-      fs, nperseg
-    );
-    if (!testCoh) throw new Error('Signal too short for coherence computation');
-    const freqs = testCoh.freqs;  // Hz
-    const nFreqs = freqs.length;
-
-    // Restrict to ULF band
-    const ulfMask = [];
-    for (let k = 0; k < nFreqs; k++) {
-      if (freqs[k] <= maxFreqHz) ulfMask.push(k);
-    }
-    const ulfFreqs = ulfMask.map(k => freqs[k]);
-    const nULF = ulfFreqs.length;
-
-    // Sliding windows
-    const times = [];
-    const coherogramData = []; // [timeIdx][freqIdx] = mean coherence
-
-    let sliceIdx = 0;
-    for (let start = 0; start + sliceSamples <= nSamples; start += stepSamples) {
-      times.push(start + sliceSamples / 2); // center of window in samples
-
-      // Extract slices for each station
-      const slices = {};
-      for (const s of activeList) {
-        slices[s.id] = diffSignals[s.id].slice(start, start + sliceSamples);
+    const times=[], windowStarts=[], coherogramData=[];
+    let sliceIdx=0;
+    for(let start=0;start+sliceSamples<=nSamples;start+=stepSamples){
+      times.push(start+sliceSamples/2);
+      windowStarts.push(start);
+      const slices={}; for(const s of activeList) slices[s.id]=diffSigs[s.id].slice(start,start+sliceSamples);
+      const sumCoh=new Float64Array(nULF);
+      let pCnt=0;
+      for(let i=0;i<activeList.length;i++) for(let j=i+1;j<activeList.length;j++){
+        const res=welchCoherence(slices[activeList[i].id],slices[activeList[j].id],fs,nperseg);
+        if(res){for(let u=0;u<nULF;u++) sumCoh[u]+=res.coherence[ulfMask[u]]; pCnt++;}
       }
-
-      // Compute coherence for all pairs (upper triangle)
-      const pairCoherences = new Float64Array(nULF);
-      let pairCount = 0;
-      for (let i = 0; i < activeList.length; i++) {
-        for (let j = i + 1; j < activeList.length; j++) {
-          const res = welchCoherence(slices[activeList[i].id], slices[activeList[j].id], fs, nperseg);
-          if (res) {
-            for (let u = 0; u < nULF; u++) pairCoherences[u] += res.coherence[ulfMask[u]];
-            pairCount++;
-          }
-        }
-      }
-      // Average across pairs
-      const rowCoh = new Float64Array(nULF);
-      if (pairCount > 0) {
-        for (let u = 0; u < nULF; u++) rowCoh[u] = pairCoherences[u] / pairCount;
-      }
-      coherogramData.push(rowCoh);
+      const row=new Float64Array(nULF);
+      if(pCnt) for(let u=0;u<nULF;u++) row[u]=sumCoh[u]/pCnt;
+      coherogramData.push(row);
       sliceIdx++;
+      if(sliceIdx%8===0){spin(`Slice ${sliceIdx}/${Math.ceil((nSamples-sliceSamples)/stepSamples+1)}…`); await tick();}
+    }
+    const nTimes=times.length;
+    setMetric('mSlices',nTimes); setMetric('mPairs',nPairs);
+    setMetric('mSigThresh',sigThreshold,3);
 
-      // yield periodically
-      if (sliceIdx % 10 === 0) {
-        updateSpinner(`Processing slice ${sliceIdx} / ${Math.ceil((nSamples - sliceSamples) / stepSamples + 1)}…`);
-        await new Promise(r => setTimeout(r, 0));
-      }
+    // 5. Event detection
+    spin('Detecting events…'); await tick();
+    const {events,threshold,meanCoh}=detectEvents(coherogramData,ulfFreqs,times,sigThreshold);
+    setMetric('mEvents',events.length);
+
+    // 6. Cross-correlation matrix
+    spin('Building correlation matrix…'); await tick();
+    const matrixMean=activeList.map(()=>new Float64Array(activeList.length));
+    for(let i=0;i<activeList.length;i++) for(let j=0;j<activeList.length;j++){
+      if(i===j){matrixMean[i][j]=1;continue;}
+      const [a,b]=i<j?[activeList[i],activeList[j]]:[activeList[j],activeList[i]];
+      const res=welchCoherence(diffSigs[a.id],diffSigs[b.id],fs,nperseg);
+      if(res){let s2=0,c=0;for(let u=0;u<nULF;u++){s2+=res.coherence[ulfMask[u]];c++;} matrixMean[i][j]=c?s2/c:0;}
     }
 
-    const nTimes = times.length;
-    setMetric('mSlices', nTimes);
-    setMetric('mPairs', nPairs);
-
-    // 5. Compute cross-correlation matrix (mean coherence per pair across all time/freq)
-    updateSpinner('Building cross-correlation matrix…');
-    const matrixMean = [];
-    for (let i = 0; i < activeList.length; i++) {
-      matrixMean.push(new Float64Array(activeList.length));
-    }
-    // Per-pair mean coherence across all windows and ULF freqs
-    for (let i = 0; i < activeList.length; i++) {
-      for (let j = 0; j < activeList.length; j++) {
-        if (i === j) { matrixMean[i][j] = 1; continue; }
-        const si = activeList[i], sj = activeList[j];
-        const [a, b] = i < j ? [si, sj] : [sj, si];
-        // Re-compute mean coherence for this pair across ALL data (not windowed)
-        const res = welchCoherence(diffSignals[a.id], diffSignals[b.id], fs, nperseg);
-        if (res) {
-          let sum = 0, cnt = 0;
-          for (let u = 0; u < nULF; u++) { sum += res.coherence[ulfMask[u]]; cnt++; }
-          matrixMean[i][j] = cnt > 0 ? sum / cnt : 0;
-        }
-      }
+    // 7. FFT spectra
+    spin('Computing FFT spectra…'); await tick();
+    const stationFFT={};
+    for(const s of activeList){
+      const sig=diffSigs[s.id];
+      const nfft=nextPow2(Math.min(sig.length,4096));
+      const re=new Float64Array(nfft),im=new Float64Array(nfft);
+      for(let i=0;i<nfft&&i<sig.length;i++) re[i]=sig[i]*0.5*(1-Math.cos(2*Math.PI*i/(nfft-1)));
+      fft(re,im);
+      const half=(nfft>>1)+1, psd=new Float64Array(half), pFreqs=new Float64Array(half);
+      for(let k=0;k<half;k++){psd[k]=Math.log10(Math.max(1e-30,re[k]*re[k]+im[k]*im[k]));pFreqs[k]=k*fs/nfft;}
+      stationFFT[s.id]={psd,freqs:pFreqs};
     }
 
-    // 6. FFT spectra for all stations
-    updateSpinner('Computing FFT power spectra…');
-    const stationFFT = {};
-    for (const s of activeList) {
-      const sig = diffSignals[s.id];
-      const nfft = nextPow2(Math.min(sig.length, 4096));
-      const re = new Float64Array(nfft);
-      const im = new Float64Array(nfft);
-      const win = new Float64Array(nfft);
-      for (let i = 0; i < nfft; i++) win[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (nfft - 1)));
-      for (let i = 0; i < nfft && i < sig.length; i++) re[i] = sig[i] * win[i];
-      fft(re, im);
-      const halfN = (nfft >> 1) + 1;
-      const psd = new Float64Array(halfN);
-      const psdFreqs = new Float64Array(halfN);
-      for (let k = 0; k < halfN; k++) {
-        psd[k] = Math.log10(Math.max(1e-30, re[k]*re[k] + im[k]*im[k]));
-        psdFreqs[k] = k * fs / nfft;
-      }
-      stationFFT[s.id] = { psd, freqs: psdFreqs };
-    }
+    // 8. Peak stats
+    let maxCoh=0,peakFreqHz=0;
+    for(let t=0;t<nTimes;t++) for(let u=0;u<nULF;u++) if(coherogramData[t][u]>maxCoh){maxCoh=coherogramData[t][u];peakFreqHz=ulfFreqs[u];}
+    setMetric('mPeakFreq',peakFreqHz*1000,1); setMetric('mPeakCoh',maxCoh,3);
 
-    // 7. Find peak ULF freq from coherogram
-    let maxCoh = 0, peakFreqHz = 0;
-    for (let t = 0; t < nTimes; t++) {
-      for (let u = 0; u < nULF; u++) {
-        if (coherogramData[t][u] > maxCoh) {
-          maxCoh = coherogramData[t][u];
-          peakFreqHz = ulfFreqs[u];
-        }
-      }
-    }
-    setMetric('mPeakFreq', peakFreqHz * 1000, 1);
-    setMetric('mPeakCoh', maxCoh, 3);
+    lastResult={coherogramData,times,windowStarts,ulfFreqs,ulfMask,nTimes,nULF,
+      activeList,diffSigs,stationFFT,matrixMean,maxCoh,nSamples,nPairs,
+      useSynth,src,sliceSamples,sigThreshold,events,threshold,meanCoh,
+      allFreqs,nperseg,fs};
 
-    // Store result
-    lastResult = {
-      coherogramData, times, ulfFreqs, nTimes, nULF,
-      activeList, diffSignals, stationFFT, matrixMean,
-      maxCoh, nSamples, nPairs, useSynthetic, src
-    };
-
-    // 8. Render
-    updateSpinner('Rendering…');
-    await new Promise(r => setTimeout(r, 10));
-
-    renderCoherogram(lastResult);
-    renderTimeSeries(lastResult);
-    renderFFTSpectra(lastResult);
-    renderMatrix(lastResult);
-
-    // Remove spinner
+    // 9. Render
+    spin('Rendering…'); await tick();
     wrap.removeChild(spinner);
-    spinner = null;
+    renderCoherogram(lastResult);
+    if(currentTab===1) renderTimeSeries(lastResult);
+    if(currentTab===2) renderFFTSpectra(lastResult);
+    if(currentTab===3) renderMatrix(lastResult);
+    if(currentTab===4) startGlobe(lastResult);
+    drawColorbar(sigThreshold);
 
-    const dataLabel = useSynthetic
-      ? 'synthetic substorm simulation'
-      : `NOAA SWPC (${src})`;
-    setStatus('ok', `Analysis complete — ${nTimes} slices × ${nPairs} pairs · Data: ${dataLabel}`);
-
-  } catch (e) {
-    if (spinner && spinner.parentNode) spinner.parentNode.removeChild(spinner);
-    document.getElementById('cohPlaceholder').style.display = '';
-    setStatus('err', `Error: ${e.message}`);
-    console.error(e);
+    const label=useSynth?'synthetic substorm':`NOAA SWPC (${src})`;
+    setStatus('ok',`Complete — ${nTimes} slices · ${events.length} event${events.length!==1?'s':''} detected · ${label}`);
+  } catch(e) {
+    wrap.querySelectorAll('.spinner-overlay').forEach(el=>el.remove());
+    document.getElementById('cohPlaceholder').style.display='';
+    setStatus('err',`Error: ${e.message}`); console.error(e);
   }
-
-  btn.disabled = false;
+  btn.disabled=false;
 }
 
+function tick(){return new Promise(r=>setTimeout(r,0));}
+
 // ═══════════════════════════════════════════════════════════
-//  RENDER: NETWORK COHEROGRAM (Canvas heatmap, inferno)
+//  RENDER: COHEROGRAM
 // ═══════════════════════════════════════════════════════════
-function renderCoherogram(result) {
-  const { coherogramData, nTimes, nULF, ulfFreqs } = result;
-  const wrap = document.getElementById('coherogramWrap');
-  const canvas = document.getElementById('coherogramCanvas');
-  const W = wrap.clientWidth || 800;
-  const H = wrap.clientHeight || 320;
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext('2d');
+function renderCoherogram(r) {
+  const {coherogramData,nTimes,nULF,ulfFreqs,sigThreshold,events,times} = r;
+  const wrap=document.getElementById('cohWrap');
+  const canvas=document.getElementById('coherogramCanvas');
+  const W=wrap.clientWidth||800, H=wrap.clientHeight||280;
+  canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  const useMask=document.getElementById('sigMaskChk').checked;
+  const cellW=W/nTimes, cellH=H/nULF;
+  const imgData=ctx.createImageData(W,H);
+  const px=imgData.data;
 
-  // Cell dimensions
-  const cellW = W / nTimes;
-  const cellH = H / nULF;
-
-  // Build ImageData for speed
-  const imgData = ctx.createImageData(W, H);
-  const px = imgData.data;
-
-  for (let ti = 0; ti < nTimes; ti++) {
-    const x0 = Math.round(ti * cellW);
-    const x1 = Math.round((ti + 1) * cellW);
-    for (let fi = 0; fi < nULF; fi++) {
-      // Freq 0 at bottom → invert y
-      const yBottom = H - Math.round(fi * cellH);
-      const yTop    = H - Math.round((fi + 1) * cellH);
-      const coh = coherogramData[ti][fi];
-      const [r, g, b] = infernoRGB(coh);
-      for (let y = yTop; y < yBottom; y++) {
-        for (let x = x0; x < x1; x++) {
-          const idx = (y * W + x) * 4;
-          px[idx]   = r;
-          px[idx+1] = g;
-          px[idx+2] = b;
-          px[idx+3] = 255;
-        }
+  for(let ti=0;ti<nTimes;ti++){
+    const x0=Math.round(ti*cellW), x1=Math.round((ti+1)*cellW);
+    for(let fi=0;fi<nULF;fi++){
+      const yT=H-Math.round((fi+1)*cellH), yB=H-Math.round(fi*cellH);
+      let coh=coherogramData[ti][fi];
+      const masked=useMask && coh<sigThreshold;
+      const [rv,gv,bv]=infernoRGB(masked?coh*0.25:coh);
+      const alpha=masked?160:255;
+      for(let y=yT;y<yB;y++) for(let x=x0;x<x1;x++){
+        const idx=(y*W+x)*4; px[idx]=rv;px[idx+1]=gv;px[idx+2]=bv;px[idx+3]=alpha;
       }
     }
   }
-  ctx.putImageData(imgData, 0, 0);
+  ctx.putImageData(imgData,0,0);
 
-  // Draw frequency axis labels
-  ctx.fillStyle = 'rgba(0,0,0,0.55)';
-  ctx.fillRect(0, 0, 48, H);
-  ctx.fillStyle = '#ccd';
-  ctx.font = '10px monospace';
-  ctx.textAlign = 'right';
-  const freqTicksMHz = [0, 10, 20, 30, 40, 50];
-  const maxFreqHz = ulfFreqs[ulfFreqs.length - 1];
-  for (const fmhz of freqTicksMHz) {
-    const fhz = fmhz / 1000;
-    if (fhz > maxFreqHz * 1.01) continue;
-    const y = H - Math.round((fhz / maxFreqHz) * H);
-    ctx.fillText(`${fmhz}`, 44, Math.max(10, Math.min(H - 2, y + 4)));
-    ctx.fillStyle = 'rgba(200,210,230,0.2)';
-    ctx.fillRect(46, Math.max(0, y), W - 46, 1);
-    ctx.fillStyle = '#ccd';
-  }
-  // Axis label
-  ctx.save();
-  ctx.translate(9, H / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillStyle = '#aab';
-  ctx.font = '10px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('Freq (mHz)', 0, 0);
-  ctx.restore();
-
-  // Time axis labels
-  ctx.fillStyle = 'rgba(0,0,0,0.45)';
-  ctx.fillRect(0, H - 16, W, 16);
-  ctx.fillStyle = '#ccd';
-  ctx.font = '10px monospace';
-  ctx.textAlign = 'center';
-  const nLabels = Math.min(8, nTimes);
-  for (let li = 0; li <= nLabels; li++) {
-    const ti = Math.round(li * (nTimes - 1) / nLabels);
-    const x = Math.round(ti * cellW + cellW / 2);
-    const tMin = Math.round(result.times[Math.min(ti, nTimes - 1)] / 60);
-    ctx.fillText(`${tMin}m`, x, H - 3);
+  // Event annotations
+  for(const ev of events){
+    const x0=Math.round(ev.startTi*cellW), x1=Math.round((ev.endTi+1)*cellW);
+    ctx.fillStyle=ev.bandColor+'28';
+    ctx.fillRect(x0,0,x1-x0,H);
+    ctx.strokeStyle=ev.bandColor+'99';
+    ctx.lineWidth=1;
+    ctx.strokeRect(x0,0,x1-x0,H);
+    ctx.fillStyle=ev.bandColor;
+    ctx.font='bold 10px sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(ev.band, (x0+x1)/2, 13);
   }
 
-  drawColorbar();
+  // Freq axis
+  ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,0,46,H);
+  ctx.fillStyle='#aab'; ctx.font='10px monospace'; ctx.textAlign='right';
+  const maxFMHz=ulfFreqs[ulfFreqs.length-1]*1000;
+  for(const fmhz of [0,10,20,30,40,50,75,100]){
+    if(fmhz>maxFMHz*1.01) continue;
+    const y=H-Math.round((fmhz/1000/ulfFreqs[ulfFreqs.length-1])*H);
+    ctx.fillStyle='rgba(180,190,210,0.18)'; ctx.fillRect(46,Math.max(0,y),W-46,1);
+    ctx.fillStyle='#aab'; ctx.fillText(fmhz,43,Math.max(10,Math.min(H-2,y+4)));
+  }
+  ctx.save(); ctx.translate(9,H/2); ctx.rotate(-Math.PI/2);
+  ctx.fillStyle='#889'; ctx.font='10px sans-serif'; ctx.textAlign='center';
+  ctx.fillText('Freq (mHz)',0,0); ctx.restore();
+
+  // Time axis
+  ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(0,H-15,W,15);
+  ctx.fillStyle='#aab'; ctx.font='10px monospace'; ctx.textAlign='center';
+  const nL=Math.min(8,nTimes);
+  for(let li=0;li<=nL;li++){
+    const ti=Math.round(li*(nTimes-1)/nL);
+    const x=Math.round(ti*cellW+cellW/2);
+    const tm=Math.round(times[Math.min(ti,nTimes-1)]/60);
+    ctx.fillText(`${tm}m`,x,H-3);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
-//  RENDER: RAW TIME SERIES (Chart.js)
+//  COHEROGRAM INTERACTION
 // ═══════════════════════════════════════════════════════════
-function renderTimeSeries(result) {
-  const { activeList, diffSignals, nSamples } = result;
-  document.getElementById('tsEmpty').style.display = 'none';
+function setupCoherogramInteraction() {
+  const wrap=document.getElementById('cohWrap');
+  const canvas=document.getElementById('coherogramCanvas');
+  const tooltip=document.getElementById('cohTooltip');
 
-  const stride = Math.max(1, Math.floor(nSamples / 1200));
-  const labels = [];
-  for (let i = 0; i < nSamples; i += stride) labels.push(Math.round(i / 60) + 'm');
-
-  const datasets = activeList.map(s => {
-    const sig = diffSignals[s.id];
-    const data = [];
-    for (let i = 0; i < sig.length; i += stride) data.push(+sig[i].toFixed(4));
-    return {
-      label: s.id,
-      data,
-      borderColor: s.color,
-      borderWidth: 1,
-      pointRadius: 0,
-      tension: 0,
-    };
+  wrap.addEventListener('mousemove', e=>{
+    if(!lastResult) return;
+    const rect=canvas.getBoundingClientRect();
+    const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+    const {nTimes,nULF,ulfFreqs,coherogramData,times}=lastResult;
+    const ti=Math.floor(mx/rect.width*nTimes);
+    const fi=Math.floor((1-my/rect.height)*nULF);
+    if(ti<0||ti>=nTimes||fi<0||fi>=nULF) return;
+    const coh=coherogramData[ti][fi];
+    const fmhz=(ulfFreqs[fi]*1000).toFixed(1);
+    const tmin=(times[ti]/60).toFixed(1);
+    tooltip.style.display='block';
+    tooltip.style.left=Math.min(mx+12,rect.width-140)+'px';
+    tooltip.style.top=Math.max(my-36,4)+'px';
+    tooltip.innerHTML=`<b>γ² = ${coh.toFixed(3)}</b> &nbsp; ${fmhz} mHz &nbsp; t=${tmin}m`;
   });
-
-  if (tsChart) tsChart.destroy();
-  tsChart = new Chart(document.getElementById('tsCanvas'), {
-    type: 'line',
-    data: { labels, datasets },
-    options: {
-      animation: false,
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { labels: { color: '#8a9ac0', font: { size: 11 } } },
-        tooltip: { mode: 'index', intersect: false }
-      },
-      scales: {
-        x: {
-          ticks: { color: '#8a9ac0', maxTicksLimit: 10, font: { size: 10 } },
-          grid: { color: '#1f2a3c' },
-          title: { display: true, text: 'Time', color: '#8a9ac0', font: { size: 11 } }
-        },
-        y: {
-          ticks: { color: '#8a9ac0', font: { size: 10 } },
-          grid: { color: '#1f2a3c' },
-          title: { display: true, text: 'ΔBz (nT/s)', color: '#8a9ac0', font: { size: 11 } }
-        }
-      }
-    }
+  wrap.addEventListener('mouseleave',()=>{tooltip.style.display='none';});
+  wrap.addEventListener('click', e=>{
+    if(!lastResult) return;
+    const rect=canvas.getBoundingClientRect();
+    const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+    const {nTimes,nULF,ulfFreqs,times,windowStarts,sliceSamples,diffSigs,activeList,allFreqs,ulfMask,nperseg,fs,sigThreshold}=lastResult;
+    const ti=Math.floor(mx/rect.width*nTimes);
+    const fi=Math.floor((1-my/rect.height)*nULF);
+    if(ti<0||ti>=nTimes||fi<0||fi>=nULF) return;
+    openDetail(ti,fi);
   });
 }
 
-// ═══════════════════════════════════════════════════════════
-//  RENDER: FFT POWER SPECTRA (Chart.js)
-// ═══════════════════════════════════════════════════════════
-function renderFFTSpectra(result) {
-  const { activeList, stationFFT, maxCoh } = result;
-  document.getElementById('fftEmpty').style.display = 'none';
+function openDetail(ti,fi) {
+  const r=lastResult;
+  if(!r) return;
+  const {windowStarts,sliceSamples,diffSigs,activeList,ulfFreqs,allFreqs,ulfMask,nperseg,fs,times,coherogramData,sigThreshold}=r;
+  const start=windowStarts[ti];
+  const fmhz=(ulfFreqs[fi]*1000).toFixed(1);
+  const tmin=(times[ti]/60).toFixed(1);
 
-  // Use first station's freqs for labels, restrict to ULF
-  const s0 = activeList[0];
-  const psdFreqs = stationFFT[s0.id].freqs;
-  const maxFreqHz = parseFloat(document.getElementById('maxFreq').value) / 1000 || 0.05;
-
-  const ulfIdx = [];
-  for (let k = 0; k < psdFreqs.length; k++) {
-    if (psdFreqs[k] <= maxFreqHz * 1.1) ulfIdx.push(k);
-  }
-
-  const stride = Math.max(1, Math.floor(ulfIdx.length / 300));
-  const labels = ulfIdx.filter((_, i) => i % stride === 0)
-    .map(k => (psdFreqs[k] * 1000).toFixed(1) + ' mHz');
-
-  const datasets = activeList.map(s => {
-    const { psd } = stationFFT[s.id];
-    const data = ulfIdx.filter((_, i) => i % stride === 0).map(k => +psd[k].toFixed(3));
-    return {
-      label: s.id,
-      data,
-      borderColor: s.color,
-      borderWidth: 1.5,
-      pointRadius: 0,
-      tension: 0.2,
-    };
-  });
-
-  if (fftChart) fftChart.destroy();
-  fftChart = new Chart(document.getElementById('fftCanvas'), {
-    type: 'line',
-    data: { labels, datasets },
-    options: {
-      animation: false,
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { labels: { color: '#8a9ac0', font: { size: 11 } } },
-      },
-      scales: {
-        x: {
-          ticks: { color: '#8a9ac0', maxTicksLimit: 10, font: { size: 10 } },
-          grid: { color: '#1f2a3c' },
-          title: { display: true, text: 'Frequency (mHz)', color: '#8a9ac0', font: { size: 11 } }
-        },
-        y: {
-          ticks: { color: '#8a9ac0', font: { size: 10 } },
-          grid: { color: '#1f2a3c' },
-          title: { display: true, text: 'log₁₀ Power', color: '#8a9ac0', font: { size: 11 } }
-        }
-      }
-    }
-  });
-}
-
-// ═══════════════════════════════════════════════════════════
-//  RENDER: CROSS-CORRELATION MATRIX (Canvas inferno)
-// ═══════════════════════════════════════════════════════════
-function renderMatrix(result) {
-  const { activeList, matrixMean } = result;
-  const n = activeList.length;
-  document.getElementById('matrixEmpty').style.display = 'none';
-
-  const CELL = 64;
-  const PAD = 60;
-  const W = n * CELL + PAD;
-  const H = n * CELL + PAD;
-
-  // Remove old canvas if any
-  const wrap = document.getElementById('matrixWrap');
-  const oldCanvas = document.getElementById('matrixCanvas');
-  if (oldCanvas) oldCanvas.remove();
-
-  const canvas = document.createElement('canvas');
-  canvas.id = 'matrixCanvas';
-  canvas.width = W;
-  canvas.height = H;
-  canvas.style.maxWidth = '100%';
-  wrap.innerHTML = '';
-  wrap.appendChild(canvas);
-
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#111520';
-  ctx.fillRect(0, 0, W, H);
-
-  // Draw cells
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      const coh = matrixMean[i][j];
-      const [r, g, b] = infernoRGB(coh);
-      ctx.fillStyle = `rgb(${r},${g},${b})`;
-      ctx.fillRect(PAD + j * CELL, i * CELL, CELL, CELL);
-
-      // Value label
-      ctx.fillStyle = coh > 0.6 ? '#111' : '#eee';
-      ctx.font = 'bold 11px monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(coh.toFixed(2), PAD + j * CELL + CELL / 2, i * CELL + CELL / 2);
+  // Compute per-pair coherence for this window
+  const pairs=[];
+  for(let i=0;i<activeList.length;i++) for(let j=i+1;j<activeList.length;j++){
+    const sa=activeList[i], sb=activeList[j];
+    const xa=diffSigs[sa.id].slice(start,start+sliceSamples);
+    const xb=diffSigs[sb.id].slice(start,start+sliceSamples);
+    const res=welchCoherence(xa,xb,fs,nperseg);
+    if(res){
+      const cohAtFi=res.coherence[ulfMask[fi]]??0;
+      pairs.push({label:`${sa.id}–${sb.id}`,color:blendColor(sa.color,sb.color),
+        freqs:ulfFreqs, coherence:ulfMask.map(k=>res.coherence[k]), cohAtFi});
     }
   }
+  pairs.sort((a,b)=>b.cohAtFi-a.cohAtFi);
 
-  // Axis labels
-  ctx.font = '11px monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  for (let i = 0; i < n; i++) {
-    // Row labels (left)
-    ctx.fillStyle = activeList[i].color;
-    ctx.textAlign = 'right';
-    ctx.fillText(activeList[i].id, PAD - 6, i * CELL + CELL / 2);
-    // Column labels (bottom)
-    ctx.textAlign = 'center';
-    ctx.fillText(activeList[i].id, PAD + i * CELL + CELL / 2, n * CELL + 14);
+  document.getElementById('detailTitle').textContent=
+    `Window t=${tmin}m · ${fmhz} mHz · network γ²=${coherogramData[ti][fi].toFixed(3)}`;
+  const panel=document.getElementById('detailPanel');
+  panel.classList.add('open');
+
+  // Detail chart
+  if(detailChart){detailChart.destroy();detailChart=null;}
+  const dc=freshCanvas('detailCanvas');
+  const datasets=pairs.map(p=>({
+    label:p.label, data:p.freqs.map((f,i)=>({x:f*1000,y:p.coherence[i]})),
+    borderColor:p.color, borderWidth:1.5, pointRadius:0, tension:0.2
+  }));
+  detailChart=new Chart(dc,{type:'line',data:{datasets},options:{
+    animation:false,responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#8a9ac0',font:{size:10},boxWidth:12}},
+      annotation:{annotations:{}}},
+    scales:{
+      x:{type:'linear',title:{display:true,text:'Frequency (mHz)',color:'#8a9ac0',font:{size:10}},
+        ticks:{color:'#8a9ac0',font:{size:9}},grid:{color:'#1f2a3c'}},
+      y:{min:0,max:1,title:{display:true,text:'γ²',color:'#8a9ac0',font:{size:10}},
+        ticks:{color:'#8a9ac0',font:{size:9}},grid:{color:'#1f2a3c'}}
+    }
+  }});
+  requestAnimationFrame(()=>{if(detailChart)detailChart.resize();});
+
+  // Pair list
+  const pairDiv=document.getElementById('detailPairs');
+  pairDiv.innerHTML='<div style="font-size:10px;color:var(--text-dim);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">Pairs at '+fmhz+' mHz</div>';
+  for(const p of pairs){
+    const row=document.createElement('div');
+    row.className='pair-row';
+    const thresh=sigThreshold;
+    const flag=p.cohAtFi>=thresh?'✓':'';
+    row.innerHTML=`<div class="pair-swatch" style="background:${p.color}"></div>
+      <span class="pair-name">${p.label}</span>
+      <span class="pair-val">${p.cohAtFi.toFixed(3)} ${flag}</span>`;
+    pairDiv.appendChild(row);
   }
-
-  // Title
-  ctx.fillStyle = '#8a9ac0';
-  ctx.font = '11px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('Mean γ² across ULF band', W / 2, n * CELL + 36);
-
-  // Colorbar
-  const cbY = n * CELL + 50;
-  for (let x = PAD; x < W; x++) {
-    const t = (x - PAD) / (W - PAD);
-    const [r, g, b] = infernoRGB(t);
-    ctx.fillStyle = `rgb(${r},${g},${b})`;
-    ctx.fillRect(x, cbY, 1, 10);
-  }
-  ctx.fillStyle = '#8a9ac0';
-  ctx.font = '10px monospace';
-  ctx.textAlign = 'left'; ctx.fillText('0', PAD, cbY + 20);
-  ctx.textAlign = 'right'; ctx.fillText('1', W, cbY + 20);
-  ctx.textAlign = 'center'; ctx.fillText('γ²', (W + PAD) / 2, cbY + 20);
 }
+
+function closeDetail(){
+  document.getElementById('detailPanel').classList.remove('open');
+  if(detailChart){detailChart.destroy();detailChart=null;}
+}
+
+function blendColor(c1,c2){
+  const h=s=>{const r=parseInt(s.slice(1,3),16),g=parseInt(s.slice(3,5),16),b=parseInt(s.slice(5,7),16);return[r,g,b];};
+  const [r1,g1,b1]=h(c1),[r2,g2,b2]=h(c2);
+  return `rgb(${Math.round((r1+r2)/2)},${Math.round((g1+g2)/2)},${Math.round((b1+b2)/2)})`;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RENDER: TIME SERIES
+// ═══════════════════════════════════════════════════════════
+function renderTimeSeries(r){
+  const {activeList,diffSigs,nSamples}=r;
+  document.getElementById('tsEmpty').style.display='none';
+  const stride=Math.max(1,Math.floor(nSamples/1000));
+  const labels=[]; for(let i=0;i<nSamples;i+=stride) labels.push(Math.round(i/60)+'m');
+  const datasets=activeList.map(s=>({
+    label:s.id,
+    data:Array.from({length:Math.ceil(nSamples/stride)},(_,i)=>+(diffSigs[s.id][i*stride]??0).toFixed(4)),
+    borderColor:s.color,borderWidth:1,pointRadius:0,tension:0
+  }));
+  if(tsChart){tsChart.destroy();tsChart=null;}
+  tsChart=new Chart(freshCanvas('tsCanvas'),{type:'line',data:{labels,datasets},options:{
+    animation:false,responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#8a9ac0',font:{size:11}}}},
+    scales:{x:{ticks:{color:'#8a9ac0',maxTicksLimit:10,font:{size:10}},grid:{color:'#1f2a3c'},
+               title:{display:true,text:'Time',color:'#8a9ac0',font:{size:10}}},
+             y:{ticks:{color:'#8a9ac0',font:{size:10}},grid:{color:'#1f2a3c'},
+               title:{display:true,text:'ΔBz (nT/s)',color:'#8a9ac0',font:{size:10}}}}
+  }});
+  requestAnimationFrame(()=>{if(tsChart)tsChart.resize();});
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RENDER: FFT SPECTRA
+// ═══════════════════════════════════════════════════════════
+function renderFFTSpectra(r){
+  const {activeList,stationFFT}=r;
+  document.getElementById('fftEmpty').style.display='none';
+  const maxFHz=(parseFloat(document.getElementById('maxFreq').value)||50)/1000;
+  const pFreqs=stationFFT[activeList[0].id].freqs;
+  const idx=[]; for(let k=0;k<pFreqs.length;k++) if(pFreqs[k]<=maxFHz*1.1) idx.push(k);
+  const stride=Math.max(1,Math.floor(idx.length/250));
+  const labels=idx.filter((_,i)=>i%stride===0).map(k=>(pFreqs[k]*1000).toFixed(1)+' mHz');
+  const datasets=activeList.map(s=>({
+    label:s.id,
+    data:idx.filter((_,i)=>i%stride===0).map(k=>+stationFFT[s.id].psd[k].toFixed(3)),
+    borderColor:s.color,borderWidth:1.5,pointRadius:0,tension:0.2
+  }));
+  if(fftChart){fftChart.destroy();fftChart=null;}
+  fftChart=new Chart(freshCanvas('fftCanvas'),{type:'line',data:{labels,datasets},options:{
+    animation:false,responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#8a9ac0',font:{size:11}}}},
+    scales:{x:{ticks:{color:'#8a9ac0',maxTicksLimit:10,font:{size:10}},grid:{color:'#1f2a3c'},
+               title:{display:true,text:'Frequency (mHz)',color:'#8a9ac0',font:{size:10}}},
+             y:{ticks:{color:'#8a9ac0',font:{size:10}},grid:{color:'#1f2a3c'},
+               title:{display:true,text:'log₁₀ Power',color:'#8a9ac0',font:{size:10}}}}
+  }});
+  requestAnimationFrame(()=>{if(fftChart)fftChart.resize();});
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RENDER: CORRELATION MATRIX
+// ═══════════════════════════════════════════════════════════
+function renderMatrix(r){
+  const {activeList,matrixMean}=r;
+  const n=activeList.length;
+  document.getElementById('matrixEmpty').style.display='none';
+  const CELL=64,PAD=52,W=n*CELL+PAD,H=n*CELL+PAD+55;
+  const wrap=document.getElementById('matrixWrap');
+  const old=document.getElementById('matrixCanvas');
+  if(old) old.remove();
+  const canvas=document.createElement('canvas');
+  canvas.id='matrixCanvas'; canvas.width=W; canvas.height=H;
+  canvas.style.maxWidth='100%';
+  wrap.innerHTML=''; wrap.appendChild(canvas);
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#111520'; ctx.fillRect(0,0,W,H);
+  for(let i=0;i<n;i++) for(let j=0;j<n;j++){
+    const [rv,gv,bv]=infernoRGB(matrixMean[i][j]);
+    ctx.fillStyle=`rgb(${rv},${gv},${bv})`;
+    ctx.fillRect(PAD+j*CELL,i*CELL,CELL,CELL);
+    ctx.fillStyle=matrixMean[i][j]>0.55?'#111':'#eee';
+    ctx.font='bold 11px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(matrixMean[i][j].toFixed(2),PAD+j*CELL+CELL/2,i*CELL+CELL/2);
+  }
+  ctx.font='11px monospace'; ctx.textBaseline='middle';
+  for(let i=0;i<n;i++){
+    ctx.fillStyle=activeList[i].color;
+    ctx.textAlign='right'; ctx.fillText(activeList[i].id,PAD-6,i*CELL+CELL/2);
+    ctx.textAlign='center'; ctx.fillText(activeList[i].id,PAD+i*CELL+CELL/2,n*CELL+14);
+  }
+  const cbY=n*CELL+30;
+  for(let x=PAD;x<W;x++){
+    const [rv,gv,bv]=infernoRGB((x-PAD)/(W-PAD));
+    ctx.fillStyle=`rgb(${rv},${gv},${bv})`; ctx.fillRect(x,cbY,1,10);
+  }
+  ctx.fillStyle='#8a9ac0'; ctx.font='10px monospace';
+  ctx.textAlign='left'; ctx.fillText('0',PAD,cbY+20);
+  ctx.textAlign='right'; ctx.fillText('1',W,cbY+20);
+  ctx.textAlign='center'; ctx.fillText('mean γ² across ULF band',(W+PAD)/2,cbY+20);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RENDER: STATION GLOBE
+// ═══════════════════════════════════════════════════════════
+const GLOBE_CENTER=[50,-125]; // lat, lon
+const DEG=Math.PI/180;
+
+function orthoProject(lat,lon,lat0,lon0,r){
+  const φ=lat*DEG,λ=lon*DEG,φ0=lat0*DEG,λ0=lon0*DEG;
+  const cosC=Math.sin(φ0)*Math.sin(φ)+Math.cos(φ0)*Math.cos(φ)*Math.cos(λ-λ0);
+  if(cosC<0) return null;
+  return{x:r*Math.cos(φ)*Math.sin(λ-λ0),y:r*(Math.cos(φ0)*Math.sin(φ)-Math.sin(φ0)*Math.cos(φ)*Math.cos(λ-λ0))};
+}
+
+function greatCirclePts(lat1,lon1,lat2,lon2,n=60){
+  const toXYZ=([φ,λ])=>[Math.cos(φ)*Math.cos(λ),Math.cos(φ)*Math.sin(λ),Math.sin(φ)];
+  const fromXYZ=([x,y,z])=>[Math.atan2(z,Math.sqrt(x*x+y*y)),Math.atan2(y,x)];
+  const p1=toXYZ([lat1*DEG,lon1*DEG]),p2=toXYZ([lat2*DEG,lon2*DEG]);
+  const dot=p1[0]*p2[0]+p1[1]*p2[1]+p1[2]*p2[2];
+  const omega=Math.acos(Math.max(-1,Math.min(1,dot)));
+  const pts=[];
+  for(let i=0;i<=n;i++){
+    const t=i/n;
+    if(omega<0.0001){pts.push([lat1,lon1]);continue;}
+    const s=Math.sin(omega), a=Math.sin((1-t)*omega)/s, b=Math.sin(t*omega)/s;
+    const xyz=[a*p1[0]+b*p2[0],a*p1[1]+b*p2[1],a*p1[2]+b*p2[2]];
+    const [φi,λi]=fromXYZ(xyz);
+    pts.push([φi/DEG,λi/DEG]);
+  }
+  return pts;
+}
+
+let globePhase=0;
+function startGlobe(r){
+  if(globeAnimId) cancelAnimationFrame(globeAnimId);
+  buildGlobeLegend(r);
+  function loop(){
+    globePhase+=0.018;
+    drawGlobe(r,globePhase);
+    globeAnimId=requestAnimationFrame(loop);
+  }
+  loop();
+}
+function stopGlobe(){if(globeAnimId){cancelAnimationFrame(globeAnimId);globeAnimId=null;}}
+
+function drawGlobe(r,phase){
+  const canvas=document.getElementById('globeCanvas');
+  if(!canvas) return;
+  const size=Math.min(canvas.width,canvas.height);
+  const ctx=canvas.getContext('2d');
+  const cx=canvas.width/2, cy=canvas.height/2, radius=size/2-10;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Earth body
+  const grad=ctx.createRadialGradient(cx-radius*0.25,cy-radius*0.25,radius*0.05,cx,cy,radius);
+  grad.addColorStop(0,'#1a2a4a'); grad.addColorStop(1,'#060c18');
+  ctx.beginPath(); ctx.arc(cx,cy,radius,0,2*Math.PI);
+  ctx.fillStyle=grad; ctx.fill();
+  ctx.strokeStyle='#1f3060'; ctx.lineWidth=1.5; ctx.stroke();
+
+  // Grid lines
+  ctx.strokeStyle='rgba(60,90,140,0.25)'; ctx.lineWidth=0.5;
+  for(let lat=-80;lat<=80;lat+=20){
+    ctx.beginPath(); let first=true;
+    for(let lon=-180;lon<=180;lon+=2){
+      const pt=orthoProject(lat,lon,GLOBE_CENTER[0],GLOBE_CENTER[1],radius);
+      if(!pt){first=true;continue;}
+      const px=cx+pt.x, py=cy-pt.y;
+      if(first){ctx.moveTo(px,py);first=false;}else ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+  }
+  for(let lon=-180;lon<=180;lon+=20){
+    ctx.beginPath(); let first=true;
+    for(let lat=-90;lat<=90;lat+=2){
+      const pt=orthoProject(lat,lon,GLOBE_CENTER[0],GLOBE_CENTER[1],radius);
+      if(!pt){first=true;continue;}
+      const px=cx+pt.x, py=cy-pt.y;
+      if(first){ctx.moveTo(px,py);first=false;}else ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+  }
+
+  // Great circle arcs between active pairs, colored by coherence, animated dash
+  const {activeList,matrixMean}=r;
+  const n=activeList.length;
+  for(let i=0;i<n;i++) for(let j=i+1;j<n;j++){
+    const sa=activeList[i], sb=activeList[j];
+    const coh=matrixMean[i][j];
+    const [rv,gv,bv]=infernoRGB(coh);
+    const brightness=0.4+coh*0.6;
+    const pulseAlpha=brightness*(0.65+0.35*Math.sin(phase+i*1.2+j*0.8));
+    const pts=greatCirclePts(sa.lat,sa.lon,sb.lat,sb.lon);
+    ctx.setLineDash([8,5]);
+    ctx.lineDashOffset=-phase*18;
+    ctx.strokeStyle=`rgba(${rv},${gv},${bv},${pulseAlpha.toFixed(2)})`;
+    ctx.lineWidth=1+coh*2.5;
+    ctx.beginPath(); let first=true;
+    for(const [lat,lon] of pts){
+      const pt=orthoProject(lat,lon,GLOBE_CENTER[0],GLOBE_CENTER[1],radius);
+      if(!pt){first=true;continue;}
+      const px=cx+pt.x, py=cy-pt.y;
+      if(first){ctx.moveTo(px,py);first=false;}else ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Station dots + labels
+  for(const s of activeList){
+    const pt=orthoProject(s.lat,s.lon,GLOBE_CENTER[0],GLOBE_CENTER[1],radius);
+    if(!pt) continue;
+    const px=cx+pt.x, py=cy-pt.y;
+    const pulse=0.8+0.2*Math.sin(phase*2+s.phaseOffset*10);
+    ctx.beginPath(); ctx.arc(px,py,5*pulse,0,2*Math.PI);
+    ctx.fillStyle=s.color; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.stroke();
+    ctx.fillStyle='#dde'; ctx.font='bold 10px sans-serif'; ctx.textAlign='left';
+    ctx.fillText(s.id,px+8,py+4);
+  }
+}
+
+function buildGlobeLegend(r){
+  const sl=document.getElementById('globeStationLegend');
+  sl.innerHTML='';
+  for(const s of r.activeList){
+    const d=document.createElement('div'); d.className='legend-item';
+    d.innerHTML=`<div class="legend-dot" style="background:${s.color}"></div><span>${s.id} · ${s.name}</span>`;
+    sl.appendChild(d);
+  }
+  const pl=document.getElementById('globePairLegend');
+  pl.innerHTML='';
+  const {activeList,matrixMean}=r;
+  const pairs=[];
+  for(let i=0;i<activeList.length;i++) for(let j=i+1;j<activeList.length;j++)
+    pairs.push({label:`${activeList[i].id}–${activeList[j].id}`,coh:matrixMean[i][j],
+      color:blendColor(activeList[i].color,activeList[j].color)});
+  pairs.sort((a,b)=>b.coh-a.coh);
+  for(const p of pairs.slice(0,6)){
+    const d=document.createElement('div'); d.className='globe-pair-row';
+    d.innerHTML=`<div class="legend-arc" style="background:${p.color}"></div><span style="flex:1">${p.label}</span><span style="color:var(--text);font-weight:600">${p.coh.toFixed(3)}</span>`;
+    pl.appendChild(d);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  COLORBAR
+// ═══════════════════════════════════════════════════════════
+function drawColorbar(sigThreshold){
+  const canvas=document.getElementById('colorbarCanvas');
+  const W=canvas.offsetWidth||400; canvas.width=W; canvas.height=16;
+  const ctx=canvas.getContext('2d');
+  for(let x=0;x<W;x++){const[r,g,b]=infernoRGB(x/(W-1));ctx.fillStyle=`rgb(${r},${g},${b})`;ctx.fillRect(x,0,1,16);}
+  // Draw significance threshold marker
+  const el=document.getElementById('sigThreshLine');
+  if(sigThreshold&&sigThreshold<1){
+    const xPos=Math.round(sigThreshold*W);
+    ctx.strokeStyle='rgba(249,168,37,0.9)'; ctx.lineWidth=2; ctx.setLineDash([3,2]);
+    ctx.beginPath(); ctx.moveTo(xPos,0); ctx.lineTo(xPos,16); ctx.stroke();
+    ctx.setLineDash([]);
+    el.style.display='';
+    el.style.marginLeft='-2px';
+  } else { el.style.display='none'; }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  AUTO-REFRESH
+// ═══════════════════════════════════════════════════════════
+const REFRESH_INTERVAL=60;
+function toggleAutoRefresh(){
+  autoRefreshActive=!autoRefreshActive;
+  const btn=document.getElementById('autoRefreshBtn');
+  if(autoRefreshActive){
+    btn.classList.add('active'); btn.textContent='⟳ Auto-refresh ON';
+    scheduleRefresh();
+  } else {
+    btn.classList.remove('active'); btn.textContent='⟳ Auto-refresh';
+    clearTimeout(autoRefreshInterval); autoRefreshInterval=null;
+    document.getElementById('refreshCountdown').textContent='';
+  }
+}
+function scheduleRefresh(){
+  if(!autoRefreshActive) return;
+  autoRefreshSeconds=REFRESH_INTERVAL;
+  clearTimeout(autoRefreshInterval);
+  const tick=()=>{
+    if(!autoRefreshActive) return;
+    autoRefreshSeconds--;
+    document.getElementById('refreshCountdown').textContent=`Next refresh: ${autoRefreshSeconds}s`;
+    if(autoRefreshSeconds<=0){
+      document.getElementById('refreshCountdown').textContent='Refreshing…';
+      runAnalysis().then(scheduleRefresh);
+    } else { autoRefreshInterval=setTimeout(tick,1000); }
+  };
+  autoRefreshInterval=setTimeout(tick,1000);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TAB SWITCHING
+// ═══════════════════════════════════════════════════════════
+function switchTab(i){
+  document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('active',i===j));
+  document.querySelectorAll('.panel').forEach((p,j)=>p.classList.toggle('active',i===j));
+  if(i!==4) stopGlobe(); // stop animation when leaving globe tab
+  currentTab=i;
+  if(!lastResult) return;
+  requestAnimationFrame(()=>{
+    if(i===0) renderCoherogram(lastResult);
+    if(i===1) renderTimeSeries(lastResult);
+    if(i===2) renderFFTSpectra(lastResult);
+    if(i===3) renderMatrix(lastResult);
+    if(i===4) startGlobe(lastResult);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  UI HELPERS
+// ═══════════════════════════════════════════════════════════
+function setStatus(state,msg){
+  document.getElementById('statusDot').className='status-dot'+(state?' '+state:'');
+  document.getElementById('statusText').textContent=msg;
+}
+function setMetric(id,val,digits=0){
+  const el=document.getElementById(id);
+  if(el) el.textContent=(val===null||val===undefined)?'—':(typeof val==='number'?val.toFixed(digits):val);
+}
+function buildStationPills(){
+  const c=document.getElementById('stationPills');
+  STATIONS.forEach(s=>{
+    const pill=document.createElement('div');
+    pill.className='station-pill active';
+    pill.textContent=`${s.id} · ${s.name}`;
+    pill.style.cssText=`border-color:${s.color};background:${s.color}33;color:${s.color}`;
+    pill.addEventListener('click',()=>{
+      const active=activeStations.has(s.id);
+      if(active&&activeStations.size<=2){setStatus('warn','Minimum 2 stations required');return;}
+      if(active){activeStations.delete(s.id);pill.className='station-pill';pill.style.cssText=`border-color:${s.color};color:${s.color}88;background:transparent`;}
+      else{activeStations.add(s.id);pill.className='station-pill active';pill.style.cssText=`border-color:${s.color};background:${s.color}33;color:${s.color}`;}
+    });
+    c.appendChild(pill);
+  });
+}
+
+// Rerender coherogram when significance mask is toggled
+document.getElementById('sigMaskChk').addEventListener('change',()=>{
+  if(lastResult) renderCoherogram(lastResult);
+});
+
+window.addEventListener('resize',()=>{
+  drawColorbar(lastResult?.sigThreshold);
+  if(lastResult&&currentTab===0) renderCoherogram(lastResult);
+});
 
 // ═══════════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════════
 buildStationPills();
-drawColorbar();
-setStatus('', 'Ready — select a data source and press Run Analysis');
-
-window.addEventListener('resize', () => {
-  drawColorbar();
-  if (lastResult) renderCoherogram(lastResult);
-});
+drawColorbar(null);
+setStatus('','Ready — select a data source and press Run Analysis');
+setupCoherogramInteraction();
 </script>
 </body>
 </html>

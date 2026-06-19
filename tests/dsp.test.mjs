@@ -5,7 +5,7 @@ const require = createRequire(import.meta.url);
 const dsp = require('../dsp.js');
 const { fft, nextPow2, welchCoherence, welchSegments, coherenceFromSegments,
         firstDifference, computeSigThreshold, mulberry32, medianCadenceSec,
-        parseSuperMagSeries, parseUSGSSeries } = dsp;
+        parseSuperMagSeries, parseUSGSSeries, infernoRGB, circMeanPhase } = dsp;
 
 let passed = 0, failed = 0;
 function ok(cond, msg){ if(cond){ passed++; } else { failed++; console.error('  ✗ '+msg); } }
@@ -177,6 +177,73 @@ section('parseUSGSSeries');
 ok(parseUSGSSeries(null,'H').values.length===0,'non-Timeseries input → empty');
 ok(parseUSGSSeries({times:['2024-06-01T00:00:00Z'],values:[{id:'X',values:[1]}]},'H').values[0]===1,
   'falls back to first series when element id is absent');
+
+// ── infernoRGB (official LUT) ──
+section('infernoRGB');
+{
+  const black=infernoRGB(0);
+  ok(black[0]===0 && black[1]===0 && black[2]===4,'t=0 is near-black [0,0,4]');
+  const yellow=infernoRGB(1);
+  ok(yellow[0]===252 && yellow[1]===255 && yellow[2]===164,'t=1 is pale straw [252,255,164]');
+  const mid=infernoRGB(0.5);   // t=0.5 → s=127.5, lerp between i=127 and i=128
+  ok(mid[0]>180 && mid[0]<200,'t=0.5 R is warm (180–200)');
+  ok(mid[1]>45  && mid[1]<65, 't=0.5 G is low (45–65)');
+  ok(mid[2]>75  && mid[2]<95, 't=0.5 B is medium-low (75–95)');
+  // monotone red channel through most of the range
+  const r0=infernoRGB(0)[0], r50=infernoRGB(0.5)[0], r100=infernoRGB(1)[0];
+  ok(r0 < r50 && r50 < r100,'red channel increases 0→0.5→1');
+}
+
+// ── welchCoherence phase output ──
+section('welchCoherence phase');
+{
+  const nperseg=128, fs=4, n=1024;
+  // identical signals → phase should be 0 everywhere
+  const x=new Float64Array(n); for(let i=0;i<n;i++) x[i]=Math.sin(2*Math.PI*0.1*i);
+  const r=welchCoherence(x,x,fs,nperseg);
+  ok(r.phase instanceof Float64Array,'phase is Float64Array');
+  ok(r.phase.length===r.coherence.length,'phase same length as coherence');
+  let allZero=true; for(let k=1;k<r.phase.length;k++) if(Math.abs(r.phase[k])>1e-9) allZero=false;
+  ok(allZero,'identical signals → phase ≈ 0 everywhere');
+}
+{
+  // y = x shifted by one sample → phase at f should be −2π·f·Δt = −2π·f/fs
+  const nperseg=256, fs=1, n=2048;
+  const x=new Float64Array(n), y=new Float64Array(n);
+  const f0=0.05; // Hz
+  for(let i=0;i<n;i++){ x[i]=Math.sin(2*Math.PI*f0*i); y[i]=Math.sin(2*Math.PI*f0*(i-1)); }
+  const r=welchCoherence(x,y,fs,nperseg);
+  const nfft=nextPow2(nperseg), half=(nfft>>1)+1;
+  const kf0=Math.round(f0*nfft/fs);
+  // expected phase at f0: cross-spectrum Pxy = Sx·Sy* where y(t)=x(t-1) → Pxy ∝ e^{+j2πf0/fs}
+  approx(r.phase[kf0], 2*Math.PI*f0/fs, 0.15, 'phase at f0 matches 1-sample delay');
+}
+
+// ── coherenceFromSegments phase equivalence ──
+section('coherenceFromSegments phase');
+{
+  const nperseg=128, fs=2, n=900, ra=mulberry32(11), rb=mulberry32(22);
+  const x=new Float64Array(n), y=new Float64Array(n);
+  for(let i=0;i<n;i++){ x[i]=Math.sin(2*Math.PI*0.03*i)+0.5*(ra()-0.5); y[i]=Math.sin(2*Math.PI*0.03*i+0.4)+0.5*(rb()-0.5); }
+  const ref=welchCoherence(x,y,fs,nperseg);
+  const fast=coherenceFromSegments(welchSegments(x,fs,nperseg),welchSegments(y,fs,nperseg));
+  ok(fast.phase instanceof Float64Array,'fast path returns phase');
+  let maxErr=0; for(let k=0;k<ref.phase.length;k++) maxErr=Math.max(maxErr,Math.abs(ref.phase[k]-fast.phase[k]));
+  ok(maxErr<1e-9,'phase matches reference (maxErr '+maxErr.toExponential(2)+')');
+}
+
+// ── circMeanPhase ──
+section('circMeanPhase');
+{
+  approx(circMeanPhase([0,0,0]), 0, 1e-12, 'all-zero phases → 0');
+  approx(Math.abs(circMeanPhase([Math.PI,Math.PI,Math.PI])), Math.PI, 1e-10, 'all-π → π');
+  // two opposite phases cancel to ±π (the result sign is numerically uncertain at exactly π; just check near-π)
+  const m=circMeanPhase([2.967,-2.967]);  // ≈ ±170°
+  ok(Math.abs(m)>Math.PI*0.95,'180°-centred pair → near ±π');
+  // four symmetric phases cancel to zero magnitude → atan2(0,0)=0 by convention
+  const m2=circMeanPhase([0, Math.PI/2, Math.PI, -Math.PI/2]);
+  ok(isFinite(m2),'symmetric four-way phases return finite value');
+}
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed?1:0);

@@ -12,9 +12,10 @@ package.json, build step, or backend.
 
 ## Running / developing
 
-- Open `index.html` directly in a browser, or serve it (e.g. `python3 -m http.server`) and load
-  it. Serving over HTTP avoids any `file://` fetch/CORS quirks. `index.html` loads `dsp.js` via a
-  relative `<script src>`, so keep the two files together.
+- **Use `python3 proxy.py` instead of `python3 -m http.server`.** The proxy serves static files
+  on port 8080 and forwards `/api/supermag` requests to `supermag.jhuapl.edu` server-side so the
+  browser isn't CORS-blocked. `index.html` loads `dsp.js` via a relative `<script src>`, so keep
+  the two files together. Open `http://localhost:8080` after starting the proxy.
 - **DSP unit tests**: `node tests/dsp.test.mjs` (zero deps, exits non-zero on failure). These cover
   the `dsp.js` primitives, including a guard that the fast `coherenceFromSegments` path stays
   numerically equal to the reference `welchCoherence`. Run them after touching any DSP code. The

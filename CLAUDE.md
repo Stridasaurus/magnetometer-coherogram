@@ -17,7 +17,9 @@ package.json, build step, or backend.
   relative `<script src>`, so keep the two files together.
 - **DSP unit tests**: `node tests/dsp.test.mjs` (zero deps, exits non-zero on failure). These cover
   the `dsp.js` primitives, including a guard that the fast `coherenceFromSegments` path stays
-  numerically equal to the reference `welchCoherence`. Run them after touching any DSP code.
+  numerically equal to the reference `welchCoherence`. Run them after touching any DSP code. The
+  suite is a single flat script with no name filter — to run just one case, comment out the others
+  in the file (sections are delimited by `section('…')` calls).
 - Beyond that, "testing" is manual: open the page, pick a data source, press **Run Analysis**, and
   inspect the five tabs.
 - The only browser dependency is **Chart.js 4.4.1**, loaded from a CDN `<script>` tag. Chart.js

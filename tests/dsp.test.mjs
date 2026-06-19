@@ -4,7 +4,8 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const dsp = require('../dsp.js');
 const { fft, nextPow2, welchCoherence, welchSegments, coherenceFromSegments,
-        firstDifference, computeSigThreshold, mulberry32, medianCadenceSec } = dsp;
+        firstDifference, computeSigThreshold, mulberry32, medianCadenceSec,
+        parseSuperMagSeries } = dsp;
 
 let passed = 0, failed = 0;
 function ok(cond, msg){ if(cond){ passed++; } else { failed++; console.error('  ✗ '+msg); } }
@@ -131,6 +132,30 @@ section('medianCadenceSec');
   // robust to an out-of-order / duplicate glitch
   approx(medianCadenceSec([0,60000,60000,120000,180000]),60,1e-6,'median ignores a zero-gap glitch');
 }
+
+// ── parseSuperMagSeries (real per-station SuperMAG records) ──
+section('parseSuperMagSeries');
+{
+  // documented shape: tval (unix s) + N/E/Z as {nez,geo}
+  const recs=[
+    {tval:1717200000, N:{nez:12.5,geo:11.1}, E:{nez:-3.1}, Z:{nez:4.0}},
+    {tval:1717200060, N:{nez:13.0,geo:11.4}, E:{nez:-2.9}, Z:{nez:4.2}},
+    {tval:1717200120, N:{nez:12.8}, E:{nez:-3.0}, Z:{nez:4.1}},
+    {tval:1717200180, N:{nez:999999,geo:999999}, E:{nez:0}, Z:{nez:0}}, // missing → dropped
+  ];
+  const r=parseSuperMagSeries(recs,'N');
+  ok(r.values.length===3,'drops the 999999 missing-data sentinel');
+  ok(r.values[0]===12.5 && r.values[2]===12.8,'reads N.nez component');
+  approx(medianCadenceSec(r.times),60,1e-6,'SuperMAG tval → 60 s cadence');
+}
+{
+  // plain-number component form and a parseable date string
+  const recs=[{tval:'2024-06-01T00:00:00',N:5},{tval:'2024-06-01T00:01:00',N:6}];
+  const r=parseSuperMagSeries(recs,'N');
+  ok(r.values.length===2 && r.values[1]===6,'handles numeric component + ISO tval');
+}
+ok(parseSuperMagSeries(null,'N').values.length===0,'non-array input → empty series');
+ok(parseSuperMagSeries([{tval:1,N:{nez:7}}],'N').values[0]===7,'single record parsed');
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed?1:0);

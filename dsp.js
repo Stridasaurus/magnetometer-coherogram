@@ -147,7 +147,32 @@ function medianCadenceSec(times){
   return d[Math.floor(d.length/2)]/1000;
 }
 
+// ── Parse one SuperMAG station's JSON records into a {values,times} series ──
+// Defensive against the documented shapes: a record carries a timestamp
+// (`tval` unix-seconds, or a parseable date string) and N/E/Z components that
+// may be plain numbers or {nez,geo} objects. SuperMAG's ~999999 missing-data
+// sentinel and any non-finite samples are dropped. comp defaults to 'N'.
+function parseSuperMagSeries(records, comp){
+  comp = comp || 'N';
+  const values=[], times=[];
+  if(!Array.isArray(records)) return {values, times};
+  for(const rec of records){
+    if(!rec || typeof rec!=='object') continue;
+    let tms;
+    if(typeof rec.tval==='number') tms=rec.tval*1000;
+    else if(rec.tval!=null) tms=Date.parse(rec.tval);
+    else if(rec.time_tag!=null) tms=Date.parse(rec.time_tag);
+    else tms=NaN;
+    let v=rec[comp];
+    if(v && typeof v==='object') v=(v.nez!=null?v.nez:v.geo);
+    v=parseFloat(v);
+    if(isFinite(v) && Math.abs(v)<1e5 && isFinite(tms)){ values.push(v); times.push(tms); }
+  }
+  return {values, times};
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { infernoRGB, fft, nextPow2, welchCoherence, welchSegments,
-    coherenceFromSegments, firstDifference, computeSigThreshold, mulberry32, medianCadenceSec };
+    coherenceFromSegments, firstDifference, computeSigThreshold, mulberry32,
+    medianCadenceSec, parseSuperMagSeries };
 }

@@ -28,9 +28,10 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI
 .toolbar { background: var(--surface2); border-bottom: 1px solid var(--border); padding: 6px 18px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; flex-shrink: 0; }
 .tg { display: flex; align-items: center; gap: 5px; }
 .toolbar label { color: var(--text-dim); font-size: 11px; white-space: nowrap; }
-.toolbar select, .toolbar input[type=number] { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 3px 7px; border-radius: 5px; font-size: 12px; outline: none; }
-.toolbar select:focus, .toolbar input[type=number]:focus { border-color: var(--accent); }
+.toolbar select, .toolbar input[type=number], .toolbar input[type=text] { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 3px 7px; border-radius: 5px; font-size: 12px; outline: none; }
+.toolbar select:focus, .toolbar input[type=number]:focus, .toolbar input[type=text]:focus { border-color: var(--accent); }
 .toolbar input[type=number] { width: 66px; }
+.toolbar input[type=text] { width: 104px; }
 .toolbar select { min-width: 170px; }
 .toolbar-sep { width: 1px; height: 20px; background: var(--border); }
 .chk-label { display: flex; align-items: center; gap: 5px; color: var(--text-dim); font-size: 11px; cursor: pointer; user-select: none; }
@@ -159,11 +160,16 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI
   <div class="tg">
     <label>Source</label>
     <select id="srcSelect">
+      <option value="supermag">SuperMAG ground network</option>
       <option value="swpc7d">SWPC Solar Wind 7-day</option>
       <option value="swpc1d">DSCOVR Solar Wind 1-day</option>
       <option value="goes">GOES-16 Magnetometer</option>
       <option value="synthetic">Synthetic substorm</option>
     </select>
+  </div>
+  <div class="tg" id="supermagGroup">
+    <label title="Free SuperMAG account ID, used as the API logon">SuperMAG ID</label>
+    <input type="text" id="supermagUser" value="stridasaurus" placeholder="user id">
   </div>
   <div class="tg">
     <label>Slice</label>
@@ -312,13 +318,22 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI
 // ═══════════════════════════════════════════════════════════
 //  STATION CONFIG
 // ═══════════════════════════════════════════════════════════
+// IAGA codes are recognised by SuperMAG / INTERMAGNET. phaseOffset & ampScale
+// are only used by the synthetic and NOAA-derived fallback paths; with real
+// SuperMAG data each station carries its own independent measurement.
 const STATIONS = [
-  { id:'BOU', name:'Boulder CO',        lat:40.14, lon:-105.24, phaseOffset:0.00, ampScale:1.00, color:'#4f9cf9' },
-  { id:'FRD', name:'Fredericksburg VA', lat:38.20, lon:-77.37,  phaseOffset:0.15, ampScale:0.92, color:'#f97b4f' },
-  { id:'COL', name:'College AK',        lat:64.87, lon:-147.85, phaseOffset:0.31, ampScale:1.08, color:'#3ecf8e' },
-  { id:'SIT', name:'Sitka AK',          lat:57.06, lon:-135.33, phaseOffset:0.22, ampScale:0.97, color:'#f9cf4f' },
-  { id:'TUC', name:'Tucson AZ',         lat:32.17, lon:-110.88, phaseOffset:0.09, ampScale:0.85, color:'#cf4ff9' },
-  { id:'HON', name:'Honolulu HI',       lat:21.32, lon:-157.94, phaseOffset:0.44, ampScale:0.78, color:'#f94fa8' },
+  { id:'BOU', name:'Boulder, US',        lat:40.14, lon:-105.24, phaseOffset:0.00, ampScale:1.00, color:'#4f9cf9' },
+  { id:'FRD', name:'Fredericksburg, US', lat:38.20, lon:-77.37,  phaseOffset:0.15, ampScale:0.92, color:'#f97b4f' },
+  { id:'COL', name:'College, US (AK)',   lat:64.87, lon:-147.85, phaseOffset:0.31, ampScale:1.08, color:'#3ecf8e' },
+  { id:'SIT', name:'Sitka, US (AK)',     lat:57.06, lon:-135.33, phaseOffset:0.22, ampScale:0.97, color:'#f9cf4f' },
+  { id:'HON', name:'Honolulu, US (HI)',  lat:21.32, lon:-157.94, phaseOffset:0.44, ampScale:0.78, color:'#f94fa8' },
+  { id:'SJG', name:'San Juan, PR',       lat:18.11, lon:-66.15,  phaseOffset:0.12, ampScale:0.88, color:'#f95f5f' },
+  { id:'THL', name:'Qaanaaq, Greenland', lat:77.47, lon:-69.23,  phaseOffset:0.38, ampScale:1.12, color:'#5fd0f9' },
+  { id:'ESK', name:'Eskdalemuir, UK',    lat:55.31, lon:-3.21,   phaseOffset:0.27, ampScale:1.02, color:'#9b8cff' },
+  { id:'ABK', name:'Abisko, Sweden',     lat:68.36, lon:18.82,   phaseOffset:0.34, ampScale:1.05, color:'#5fe0c0' },
+  { id:'KAK', name:'Kakioka, Japan',     lat:36.23, lon:140.19,  phaseOffset:0.19, ampScale:0.95, color:'#f9cf8c' },
+  { id:'CNB', name:'Canberra, Australia',lat:-35.32,lon:149.36,  phaseOffset:0.41, ampScale:0.83, color:'#c98cf9' },
+  { id:'HER', name:'Hermanus, S. Africa',lat:-34.43,lon:19.23,   phaseOffset:0.07, ampScale:0.90, color:'#f98cd0' },
 ];
 let activeStations = new Set(STATIONS.map(s => s.id));
 
@@ -354,6 +369,44 @@ const URLS = {
   swpc1d:'https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json',
   goes:  'https://services.swpc.noaa.gov/json/goes/primary/magnetics-1-day.json',
 };
+// SuperMAG aggregates 300+ ground magnetometers worldwide into one format.
+// Its API requires a free `logon` user ID. Each station is fetched independently,
+// so coherence between stations is genuinely measured rather than modeled.
+// NOTE: if SuperMAG does not send permissive CORS headers, a static browser page
+// cannot read the response — you'd need a small same-origin proxy. On any failure
+// the app falls back to synthetic data.
+const SUPERMAG_API='https://supermag.jhuapl.edu/services/data-api.php';
+const SUPERMAG_COMPONENT='N'; // geomagnetic-north component (nT)
+
+// Fetch real, independent per-station time series from SuperMAG.
+// Returns { sigs:{id:Float64Array}, fs, cadenceSec } or null on failure.
+async function fetchSuperMag(stations, userid){
+  if(!userid){ setStatus('warn','SuperMAG needs a user ID — synthetic fallback'); return null; }
+  try {
+    // Ask for a recent 24 h window, a couple of days back so data is available.
+    const startMs=Date.now()-2*86400000;
+    const start=new Date(startMs).toISOString().slice(0,19);
+    const extent=86400;
+    const sigs={}, cadences=[];
+    for(const s of stations){
+      setStatus('busy',`SuperMAG: fetching ${s.id}…`);
+      const url=`${SUPERMAG_API}?fmt=json&logon=${encodeURIComponent(userid)}`+
+                `&start=${encodeURIComponent(start)}&extent=${extent}&station=${encodeURIComponent(s.id)}&mag`;
+      let recs;
+      try { const r=await fetch(url); if(!r.ok) throw new Error('HTTP '+r.status); recs=await r.json(); }
+      catch(e){ continue; } // skip a station that errors; others may still work
+      const {values,times}=parseSuperMagSeries(recs,SUPERMAG_COMPONENT);
+      if(values.length>=128){
+        sigs[s.id]=new Float64Array(values);
+        const c=medianCadenceSec(times); if(c>0) cadences.push(c);
+      }
+    }
+    if(Object.keys(sigs).length<2) throw new Error('fewer than 2 stations returned data');
+    cadences.sort((a,b)=>a-b);
+    const cadenceSec=cadences.length?cadences[Math.floor(cadences.length/2)]:60;
+    return {sigs, fs:1/cadenceSec, cadenceSec};
+  } catch(e){ setStatus('warn',`SuperMAG fetch failed (${e.message}) — synthetic fallback`); return null; }
+}
 async function fetchBaseSignal(src) {
   if (src==='synthetic') return null;
   try {
@@ -451,39 +504,55 @@ async function runAnalysis() {
 
   await tick();
   try {
-    // 1. Data — derive the real sampling rate (synthetic stays at 1 Hz)
-    const baseObj=await fetchBaseSignal(src);
-    const useSynth=!baseObj;
-    const base=useSynth?null:baseObj.bz;
-    const fs=useSynth?1:baseObj.fs;
-    const cadenceSec=useSynth?1:baseObj.cadenceSec;
+    // 1. Data — three paths: real independent SuperMAG stations, the single
+    //    NOAA base signal (per-station derived), or a synthetic fallback.
+    const requested=STATIONS.filter(s=>activeStations.has(s.id));
+    let stationSigs={}, fs, cadenceSec;
+    if(src==='supermag'){
+      const userid=document.getElementById('supermagUser').value.trim();
+      spin('Fetching SuperMAG ground stations…'); await tick();
+      const sm=await fetchSuperMag(requested,userid);
+      if(sm){ stationSigs=sm.sigs; fs=sm.fs; cadenceSec=sm.cadenceSec; }
+    } else if(src!=='synthetic'){
+      const baseObj=await fetchBaseSignal(src);
+      if(baseObj){
+        fs=baseObj.fs; cadenceSec=baseObj.cadenceSec;
+        const base=baseObj.bz;
+        let rms=0; for(let i=0;i<base.length;i++) rms+=base[i]*base[i];
+        rms=Math.sqrt(rms/base.length)||1;
+        const noiseAmp=rms*0.45;
+        for(const s of requested){
+          const delay=Math.round(30+s.phaseOffset*(270-30)/0.44);
+          const rng=mulberry32(s.id.charCodeAt(0)*9999991+7);
+          const sig=new Float64Array(base.length);
+          for(let i=0;i<base.length;i++) sig[i]=base[Math.max(0,i-delay)]*s.ampScale+(rng()-0.5)*2*noiseAmp;
+          stationSigs[s.id]=sig;
+        }
+      }
+    }
+    const useSynth=Object.keys(stationSigs).length<2;
+    if(useSynth){
+      spin('Generating synthetic station signals…'); await tick();
+      stationSigs={}; fs=1; cadenceSec=1;
+      const N_SYNTH=7200;
+      for(const s of requested) stationSigs[s.id]=generateSynthetic(N_SYNTH,fs,s);
+    }
+
+    // Keep only stations that actually have data, trimmed to a common length
+    // (real per-station feeds can differ in length / be missing entirely).
+    const activeList=requested.filter(s=>stationSigs[s.id]&&stationSigs[s.id].length>0);
+    if(activeList.length<2) throw new Error('Need at least 2 stations with data');
+    const minLen=Math.min(...activeList.map(s=>stationSigs[s.id].length));
+    for(const s of activeList) if(stationSigs[s.id].length>minLen) stationSigs[s.id]=stationSigs[s.id].subarray(0,minLen);
+    const nPairs=activeList.length*(activeList.length-1)/2;
+
     // Frequencies above Nyquist (fs/2) are unresolvable — clamp the band there
     // so the UI never implies it can see e.g. Pc3 in 1-minute data.
     const maxFreqHz=Math.min(userMaxFreqHz, fs/2);
     document.getElementById('maxFreqLabel').textContent=(maxFreqHz*1000).toFixed(maxFreqHz<0.01?1:0);
     setProvBadge(useSynth,src,cadenceSec);
-    const activeList=STATIONS.filter(s=>activeStations.has(s.id));
-    const nPairs=activeList.length*(activeList.length-1)/2;
 
-    // 2. Station signals
-    spin('Generating station signals…'); await tick();
-    const N_SYNTH=7200;
-    const stationSigs={};
-    for(const s of activeList){
-      if(useSynth){ stationSigs[s.id]=generateSynthetic(N_SYNTH,fs,s); }
-      else{
-        let rms=0; for(let i=0;i<base.length;i++) rms+=base[i]*base[i];
-        rms=Math.sqrt(rms/base.length)||1;
-        const noiseAmp=rms*0.45;
-        const delay=Math.round(30+s.phaseOffset*(270-30)/0.44);
-        const rng=mulberry32(s.id.charCodeAt(0)*9999991+7);
-        const sig=new Float64Array(base.length);
-        for(let i=0;i<base.length;i++) sig[i]=base[Math.max(0,i-delay)]*s.ampScale+(rng()-0.5)*2*noiseAmp;
-        stationSigs[s.id]=sig;
-      }
-    }
-
-    // 3. First-difference
+    // 2. First-difference
     const diffSigs={};
     for(const s of activeList) diffSigs[s.id]=firstDifference(stationSigs[s.id]);
     const nSamples=diffSigs[activeList[0].id].length;
@@ -577,7 +646,7 @@ async function runAnalysis() {
     if(currentTab===4) startGlobe(lastResult);
     drawColorbar(sigThreshold);
 
-    const label=useSynth?'synthetic substorm':`NOAA SWPC (${src})`;
+    const label=useSynth?'synthetic substorm':(src==='supermag'?`SuperMAG (${activeList.length} stations)`:`NOAA SWPC (${src})`);
     setStatus('ok',`Complete — ${nTimes} slices · ${events.length} event${events.length!==1?'s':''} detected · ${label}`);
   } catch(e) {
     wrap.querySelectorAll('.spinner-overlay').forEach(el=>el.remove());
@@ -879,8 +948,18 @@ function renderMatrix(r){
 // ═══════════════════════════════════════════════════════════
 //  RENDER: STATION GLOBE
 // ═══════════════════════════════════════════════════════════
-const GLOBE_CENTER=[50,-125]; // lat, lon
+let globeCenter=[50,-125]; // viewpoint [lat, lon] — recentered on active stations
 const DEG=Math.PI/180;
+
+// Centroid of a set of stations (handles longitude wrap), so the globe view
+// frames whatever global subset is active rather than a fixed North America.
+function stationCentroid(list){
+  if(!list||!list.length) return [50,-125];
+  let x=0,y=0,z=0;
+  for(const s of list){ const la=s.lat*DEG, lo=s.lon*DEG; x+=Math.cos(la)*Math.cos(lo); y+=Math.cos(la)*Math.sin(lo); z+=Math.sin(la); }
+  const lon=Math.atan2(y,x)/DEG, lat=Math.atan2(z,Math.sqrt(x*x+y*y))/DEG;
+  return [lat,lon];
+}
 
 function orthoProject(lat,lon,lat0,lon0,r){
   const φ=lat*DEG,λ=lon*DEG,φ0=lat0*DEG,λ0=lon0*DEG;
@@ -910,6 +989,7 @@ function greatCirclePts(lat1,lon1,lat2,lon2,n=60){
 let globePhase=0;
 function startGlobe(r){
   if(globeAnimId) cancelAnimationFrame(globeAnimId);
+  globeCenter=stationCentroid(r.activeList);
   buildGlobeLegend(r);
   function loop(){
     globePhase+=0.018;
@@ -940,7 +1020,7 @@ function drawGlobe(r,phase){
   for(let lat=-80;lat<=80;lat+=20){
     ctx.beginPath(); let first=true;
     for(let lon=-180;lon<=180;lon+=2){
-      const pt=orthoProject(lat,lon,GLOBE_CENTER[0],GLOBE_CENTER[1],radius);
+      const pt=orthoProject(lat,lon,globeCenter[0],globeCenter[1],radius);
       if(!pt){first=true;continue;}
       const px=cx+pt.x, py=cy-pt.y;
       if(first){ctx.moveTo(px,py);first=false;}else ctx.lineTo(px,py);
@@ -950,7 +1030,7 @@ function drawGlobe(r,phase){
   for(let lon=-180;lon<=180;lon+=20){
     ctx.beginPath(); let first=true;
     for(let lat=-90;lat<=90;lat+=2){
-      const pt=orthoProject(lat,lon,GLOBE_CENTER[0],GLOBE_CENTER[1],radius);
+      const pt=orthoProject(lat,lon,globeCenter[0],globeCenter[1],radius);
       if(!pt){first=true;continue;}
       const px=cx+pt.x, py=cy-pt.y;
       if(first){ctx.moveTo(px,py);first=false;}else ctx.lineTo(px,py);
@@ -974,7 +1054,7 @@ function drawGlobe(r,phase){
     ctx.lineWidth=1+coh*2.5;
     ctx.beginPath(); let first=true;
     for(const [lat,lon] of pts){
-      const pt=orthoProject(lat,lon,GLOBE_CENTER[0],GLOBE_CENTER[1],radius);
+      const pt=orthoProject(lat,lon,globeCenter[0],globeCenter[1],radius);
       if(!pt){first=true;continue;}
       const px=cx+pt.x, py=cy-pt.y;
       if(first){ctx.moveTo(px,py);first=false;}else ctx.lineTo(px,py);
@@ -985,7 +1065,7 @@ function drawGlobe(r,phase){
 
   // Station dots + labels
   for(const s of activeList){
-    const pt=orthoProject(s.lat,s.lon,GLOBE_CENTER[0],GLOBE_CENTER[1],radius);
+    const pt=orthoProject(s.lat,s.lon,globeCenter[0],globeCenter[1],radius);
     if(!pt) continue;
     const px=cx+pt.x, py=cy-pt.y;
     const pulse=0.8+0.2*Math.sin(phase*2+s.phaseOffset*10);
@@ -1166,6 +1246,7 @@ const SETTINGS_KEY='coherogram_settings_v1';
 function collectSettings(){
   return {
     src:document.getElementById('srcSelect').value,
+    supermagUser:document.getElementById('supermagUser').value,
     sliceLen:document.getElementById('sliceLen').value,
     stepSize:document.getElementById('stepSize').value,
     maxFreq:document.getElementById('maxFreq').value,
@@ -1176,6 +1257,7 @@ function collectSettings(){
 function applySettings(s){
   if(!s) return;
   if(s.src!=null) document.getElementById('srcSelect').value=s.src;
+  if(s.supermagUser!=null) document.getElementById('supermagUser').value=s.supermagUser;
   if(s.sliceLen!=null) document.getElementById('sliceLen').value=s.sliceLen;
   if(s.stepSize!=null) document.getElementById('stepSize').value=s.stepSize;
   if(s.maxFreq!=null) document.getElementById('maxFreq').value=s.maxFreq;
@@ -1212,7 +1294,7 @@ window.addEventListener('resize',()=>{
 // ═══════════════════════════════════════════════════════════
 applySettings(loadSettings());            // URL hash > localStorage > defaults
 buildStationPills();                       // reflects restored activeStations
-['srcSelect','sliceLen','stepSize','maxFreq','sigMaskChk']
+['srcSelect','supermagUser','sliceLen','stepSize','maxFreq','sigMaskChk']
   .forEach(id=>document.getElementById(id).addEventListener('change',saveSettings));
 drawColorbar(null);
 setStatus('','Ready — select a data source and press Run Analysis');

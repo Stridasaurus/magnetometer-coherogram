@@ -23,14 +23,16 @@ package.json, build step, or backend.
 - The only browser dependency is **Chart.js 4.4.1**, loaded from a CDN `<script>` tag. Chart.js
   is used for the line-chart tabs (Time Series, FFT, window detail); everything else is hand-drawn
   on `<canvas>` 2D contexts.
-- Three data sources (toolbar **Source**): **SuperMAG** (`fetchSuperMag`) fetches a *genuinely
-  independent* per-station series for each active `STATIONS` entry by IAGA code — this is the only
-  source where inter-station coherence is measured rather than modeled; it needs a free SuperMAG
-  user ID (the `logon` API param, taken from the **SuperMAG ID** field) and may be blocked by CORS
-  from a static page (then fall back / use a proxy). **NOAA SWPC** (`fetchBaseSignal`, see `URLS`)
-  returns one base signal from which the stations are *derived*. **Synthetic** generates signals
-  locally. On any fetch failure the app falls back to synthetic, and the persistent provenance badge
-  shows **REAL · source · cadence** vs **SYNTHETIC**, so the UI always produces output.
+- Data sources (toolbar **Source**) — two give *genuinely independent* per-station series (so
+  coherence is measured, not modeled): **USGS** (`fetchUSGS` → `parseUSGSSeries`, default) needs no
+  account but only serves US observatories (foreign `STATIONS` are dropped); **SuperMAG**
+  (`fetchSuperMag` → `parseSuperMagSeries`) is global but needs a free user ID (the `logon` param,
+  from the **SuperMAG ID** field). Both fetch by IAGA code — so a station's `id` must be its real
+  IAGA code (e.g. College is `CMO`, not `COL`) — and both may be blocked by CORS from a static page
+  (then synthetic fallback / use a proxy). **NOAA SWPC** (`fetchBaseSignal`, see `URLS`) returns one
+  base signal from which stations are *derived* (modeled). **Synthetic** generates locally. On any
+  fetch failure the app falls back to synthetic; the header provenance badge shows
+  **REAL · source · cadence** vs **SYNTHETIC**, so the UI always produces output.
 - Toolbar settings + active stations are persisted to `localStorage` and encoded in the URL hash
   (`saveSettings`/`loadSettings`, precedence URL > localStorage > defaults), so a configuration is
   shareable/reproducible. **PNG**/**CSV** export buttons dump the current coherogram.
@@ -69,7 +71,8 @@ Supporting primitives all live in **`dsp.js`**: `fft` (in-place iterative Cooley
 power-of-2 length** — use `nextPow2`), `infernoRGB` (approximate inferno colormap, drives every
 heatmap and the globe arcs), `mulberry32` (seeded RNG for reproducible synthetic data), plus
 `welchCoherence`/`welchSegments`/`coherenceFromSegments`, `firstDifference`, `computeSigThreshold`,
-`medianCadenceSec`, and `parseSuperMagSeries` (pure SuperMAG-record → `{values,times}` parser).
+`medianCadenceSec`, and the per-source parsers `parseSuperMagSeries` / `parseUSGSSeries`
+(records → `{values,times}`).
 Keep `dsp.js` free of DOM/app state; if you add a primitive there, export it at the bottom and add a
 test in `tests/dsp.test.mjs`.
 

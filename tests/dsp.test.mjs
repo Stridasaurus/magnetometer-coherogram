@@ -5,7 +5,7 @@ const require = createRequire(import.meta.url);
 const dsp = require('../dsp.js');
 const { fft, nextPow2, welchCoherence, welchSegments, coherenceFromSegments,
         firstDifference, computeSigThreshold, mulberry32, medianCadenceSec,
-        parseSuperMagSeries } = dsp;
+        parseSuperMagSeries, parseUSGSSeries } = dsp;
 
 let passed = 0, failed = 0;
 function ok(cond, msg){ if(cond){ passed++; } else { failed++; console.error('  ✗ '+msg); } }
@@ -156,6 +156,27 @@ section('parseSuperMagSeries');
 }
 ok(parseSuperMagSeries(null,'N').values.length===0,'non-array input → empty series');
 ok(parseSuperMagSeries([{tval:1,N:{nez:7}}],'N').values[0]===7,'single record parsed');
+
+// ── parseUSGSSeries (USGS Geomagnetism "Timeseries" JSON) ──
+section('parseUSGSSeries');
+{
+  const json={
+    type:'Timeseries',
+    times:['2024-06-01T00:00:00Z','2024-06-01T00:01:00Z','2024-06-01T00:02:00Z','2024-06-01T00:03:00Z'],
+    values:[
+      {id:'H', values:[20512.3, 20512.5, 20512.1, null]}, // null gap dropped, large absolute kept
+      {id:'Z', values:[48000, 48001, 48002, 48003]},
+    ],
+  };
+  const r=parseUSGSSeries(json,'H');
+  ok(r.values.length===3,'drops the null gap, keeps large absolute nT');
+  ok(r.values[0]===20512.3 && r.values[2]===20512.1,'selects the requested element (H)');
+  approx(medianCadenceSec(r.times),60,1e-6,'USGS ISO times → 60 s cadence');
+  ok(parseUSGSSeries(json,'Z').values[1]===48001,'can select a different element');
+}
+ok(parseUSGSSeries(null,'H').values.length===0,'non-Timeseries input → empty');
+ok(parseUSGSSeries({times:['2024-06-01T00:00:00Z'],values:[{id:'X',values:[1]}]},'H').values[0]===1,
+  'falls back to first series when element id is absent');
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed?1:0);

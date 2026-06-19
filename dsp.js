@@ -171,8 +171,26 @@ function parseSuperMagSeries(records, comp){
   return {values, times};
 }
 
+// ── Parse the USGS Geomagnetism web-service "Timeseries" JSON ──
+// Shape: { times:[ISO,…], values:[ { id:'H', values:[num|null,…] }, … ] }.
+// Pairs the chosen element's samples with `times`, dropping null/non-finite
+// gaps. Values are absolute field (nT, ~tens of thousands) — no magnitude
+// filter; the first-difference downstream removes the DC level.
+function parseUSGSSeries(json, element){
+  const out={values:[], times:[]};
+  if(!json || typeof json!=='object' || !Array.isArray(json.times) || !Array.isArray(json.values)) return out;
+  const series=json.values.find(s=>s && s.id===element) || json.values[0];
+  if(!series || !Array.isArray(series.values)) return out;
+  const vals=series.values, times=json.times, n=Math.min(vals.length, times.length);
+  for(let i=0;i<n;i++){
+    const v=parseFloat(vals[i]), t=Date.parse(times[i]);
+    if(isFinite(v) && isFinite(t)){ out.values.push(v); out.times.push(t); }
+  }
+  return out;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { infernoRGB, fft, nextPow2, welchCoherence, welchSegments,
     coherenceFromSegments, firstDifference, computeSigThreshold, mulberry32,
-    medianCadenceSec, parseSuperMagSeries };
+    medianCadenceSec, parseSuperMagSeries, parseUSGSSeries };
 }

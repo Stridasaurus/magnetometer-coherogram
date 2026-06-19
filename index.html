@@ -160,7 +160,8 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI
   <div class="tg">
     <label>Source</label>
     <select id="srcSelect">
-      <option value="supermag">SuperMAG ground network</option>
+      <option value="usgs">USGS Geomagnetism (US, no account)</option>
+      <option value="supermag">SuperMAG ground network (global)</option>
       <option value="swpc7d">SWPC Solar Wind 7-day</option>
       <option value="swpc1d">DSCOVR Solar Wind 1-day</option>
       <option value="goes">GOES-16 Magnetometer</option>
@@ -322,12 +323,17 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI
 // are only used by the synthetic and NOAA-derived fallback paths; with real
 // SuperMAG data each station carries its own independent measurement.
 const STATIONS = [
+  // US observatories — served by both USGS and SuperMAG.
   { id:'BOU', name:'Boulder, US',        lat:40.14, lon:-105.24, phaseOffset:0.00, ampScale:1.00, color:'#4f9cf9' },
   { id:'FRD', name:'Fredericksburg, US', lat:38.20, lon:-77.37,  phaseOffset:0.15, ampScale:0.92, color:'#f97b4f' },
-  { id:'COL', name:'College, US (AK)',   lat:64.87, lon:-147.85, phaseOffset:0.31, ampScale:1.08, color:'#3ecf8e' },
+  { id:'CMO', name:'College, US (AK)',   lat:64.87, lon:-147.86, phaseOffset:0.31, ampScale:1.08, color:'#3ecf8e' },
   { id:'SIT', name:'Sitka, US (AK)',     lat:57.06, lon:-135.33, phaseOffset:0.22, ampScale:0.97, color:'#f9cf4f' },
+  { id:'NEW', name:'Newport, US (WA)',   lat:48.26, lon:-117.12, phaseOffset:0.05, ampScale:0.99, color:'#7fb0ff' },
+  { id:'TUC', name:'Tucson, US (AZ)',    lat:32.17, lon:-110.73, phaseOffset:0.09, ampScale:0.85, color:'#cf4ff9' },
   { id:'HON', name:'Honolulu, US (HI)',  lat:21.32, lon:-157.94, phaseOffset:0.44, ampScale:0.78, color:'#f94fa8' },
   { id:'SJG', name:'San Juan, PR',       lat:18.11, lon:-66.15,  phaseOffset:0.12, ampScale:0.88, color:'#f95f5f' },
+  { id:'GUA', name:'Guam, US',           lat:13.59, lon:144.87,  phaseOffset:0.36, ampScale:0.80, color:'#6fe0a0' },
+  // Foreign observatories — SuperMAG/INTERMAGNET only (skipped by USGS).
   { id:'THL', name:'Qaanaaq, Greenland', lat:77.47, lon:-69.23,  phaseOffset:0.38, ampScale:1.12, color:'#5fd0f9' },
   { id:'ESK', name:'Eskdalemuir, UK',    lat:55.31, lon:-3.21,   phaseOffset:0.27, ampScale:1.02, color:'#9b8cff' },
   { id:'ABK', name:'Abisko, Sweden',     lat:68.36, lon:18.82,   phaseOffset:0.34, ampScale:1.05, color:'#5fe0c0' },
@@ -406,6 +412,40 @@ async function fetchSuperMag(stations, userid){
     const cadenceSec=cadences.length?cadences[Math.floor(cadences.length/2)]:60;
     return {sigs, fs:1/cadenceSec, cadenceSec};
   } catch(e){ setStatus('warn',`SuperMAG fetch failed (${e.message}) — synthetic fallback`); return null; }
+}
+
+// USGS Geomagnetism web service — real per-station data for US observatories.
+// No account/API key required. Foreign stations simply return nothing and are
+// dropped. Returns { sigs:{id:Float64Array}, fs, cadenceSec } or null.
+const USGS_API='https://geomag.usgs.gov/ws/data/';
+const USGS_ELEMENT='H'; // horizontal intensity (nT) — classic for Pc pulsations
+async function fetchUSGS(stations){
+  try {
+    // Last 24 h, ending 2 h ago so near-real-time gaps don't dominate.
+    const end=new Date(Date.now()-2*3600000);
+    const start=new Date(end.getTime()-24*3600000);
+    const startISO=start.toISOString().slice(0,19)+'Z';
+    const endISO=end.toISOString().slice(0,19)+'Z';
+    const sigs={}, cadences=[];
+    for(const s of stations){
+      setStatus('busy',`USGS: fetching ${s.id}…`);
+      const url=`${USGS_API}?id=${encodeURIComponent(s.id)}&elements=${USGS_ELEMENT}`+
+                `&format=json&sampling_period=60&type=variation`+
+                `&starttime=${startISO}&endtime=${endISO}`;
+      let json;
+      try { const r=await fetch(url); if(!r.ok) throw new Error('HTTP '+r.status); json=await r.json(); }
+      catch(e){ continue; } // skip stations USGS doesn't serve / errors
+      const {values,times}=parseUSGSSeries(json,USGS_ELEMENT);
+      if(values.length>=128){
+        sigs[s.id]=new Float64Array(values);
+        const c=medianCadenceSec(times); if(c>0) cadences.push(c);
+      }
+    }
+    if(Object.keys(sigs).length<2) throw new Error('fewer than 2 stations returned data');
+    cadences.sort((a,b)=>a-b);
+    const cadenceSec=cadences.length?cadences[Math.floor(cadences.length/2)]:60;
+    return {sigs, fs:1/cadenceSec, cadenceSec};
+  } catch(e){ setStatus('warn',`USGS fetch failed (${e.message}) — synthetic fallback`); return null; }
 }
 async function fetchBaseSignal(src) {
   if (src==='synthetic') return null;
@@ -508,7 +548,11 @@ async function runAnalysis() {
     //    NOAA base signal (per-station derived), or a synthetic fallback.
     const requested=STATIONS.filter(s=>activeStations.has(s.id));
     let stationSigs={}, fs, cadenceSec;
-    if(src==='supermag'){
+    if(src==='usgs'){
+      spin('Fetching USGS observatories…'); await tick();
+      const us=await fetchUSGS(requested);
+      if(us){ stationSigs=us.sigs; fs=us.fs; cadenceSec=us.cadenceSec; }
+    } else if(src==='supermag'){
       const userid=document.getElementById('supermagUser').value.trim();
       spin('Fetching SuperMAG ground stations…'); await tick();
       const sm=await fetchSuperMag(requested,userid);
@@ -646,7 +690,7 @@ async function runAnalysis() {
     if(currentTab===4) startGlobe(lastResult);
     drawColorbar(sigThreshold);
 
-    const label=useSynth?'synthetic substorm':(src==='supermag'?`SuperMAG (${activeList.length} stations)`:`NOAA SWPC (${src})`);
+    const label=useSynth?'synthetic substorm':(src==='supermag'?`SuperMAG (${activeList.length} stations)`:src==='usgs'?`USGS (${activeList.length} stations)`:`NOAA SWPC (${src})`);
     setStatus('ok',`Complete — ${nTimes} slices · ${events.length} event${events.length!==1?'s':''} detected · ${label}`);
   } catch(e) {
     wrap.querySelectorAll('.spinner-overlay').forEach(el=>el.remove());

@@ -108,6 +108,14 @@ code { font-family: 'Consolas','Fira Mono',monospace; font-size: 12px; backgroun
 
 <!-- ══════════════════════════════════ DATA SOURCES ══════════════════════════════════ -->
 <h2>Data Sources</h2>
+<p>
+  Sources are divided into two categories. <strong>Real independent data</strong> (USGS, SuperMAG)
+  provide a genuinely independent measurement per station — coherence reflects actual geophysical
+  structure. <strong>Single-source proxy</strong> sources (NOAA SWPC, Synthetic) derive all station
+  signals from a single base measurement and will produce artificially high coherence that does not
+  represent real spatial coherence in the magnetosphere. The app labels the toolbar with a
+  <em>⚠ Modeled — coherence is synthetic</em> warning whenever a proxy source is active.
+</p>
 
 <h3>USGS Geomagnetism (default)</h3>
 <p>
@@ -402,9 +410,10 @@ code { font-family: 'Consolas','Fira Mono',monospace; font-size: 12px; backgroun
 
 <h3>Auto-refresh</h3>
 <p>
-  The <strong>⟳ Auto-refresh</strong> button re-runs the analysis every 60 seconds, keeping the
-  coherogram current for near-real-time monitoring with USGS data (which updates with a ~1-day lag).
-  The countdown is shown in the status bar.
+  The <strong>⟳ Auto-refresh</strong> button is available for live NOAA SWPC sources and
+  re-runs the analysis every 60 seconds to track the evolving solar-wind coherence structure
+  in near real time. The countdown is shown in the status bar. The button is hidden for
+  historical sources (USGS, SuperMAG) where repeating the same query would return identical data.
 </p>
 
 <!-- ══════════════════════════════════ TECH ══════════════════════════════════ -->

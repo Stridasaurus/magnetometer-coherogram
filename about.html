@@ -97,7 +97,7 @@ code { font-family: 'Consolas','Fira Mono',monospace; font-size: 12px; backgroun
 <ol>
   <li>Choose a <strong>Source</strong> (USGS is the default — no account needed, US stations only).</li>
   <li>Pick a <strong>Date / Time</strong>. USGS data is available up to yesterday; SuperMAG data has a ~60-day lag.</li>
-  <li>Select which <strong>Stations</strong> to include by clicking the pills in the station bar. Active stations are highlighted.</li>
+  <li>Select which <strong>Stations</strong> to include using the station dropdown. Click the summary button to open a searchable list; check or uncheck individual stations.</li>
   <li>Press <strong>▶ Run Analysis</strong>. Real data is fetched and analysed; results appear across five tabs.</li>
   <li>Click any cell in the coherogram to inspect the per-pair coherence spectra for that window.</li>
 </ol>
@@ -119,41 +119,109 @@ code { font-family: 'Consolas','Fira Mono',monospace; font-size: 12px; backgroun
 
 <h3>USGS Geomagnetism (default)</h3>
 <p>
-  Fetches real 1-minute cadence data from the <a href="https://geomag.usgs.gov/" target="_blank">USGS
-  Geomagnetism Program</a> API. No account required. Coverage is US observatories only — stations
-  outside the US are automatically dimmed and excluded. Data is typically available up to yesterday.
-  Reliable and fast; the best starting point.
+  Fetches real 1-minute cadence data from the
+  <a href="https://geomag.usgs.gov/" target="_blank">USGS Geomagnetism Program</a> API.
+  No account required.
 </p>
+<table class="param-table">
+  <tr><th>Detail</th><th></th></tr>
+  <tr><td><span class="param-name">Coverage</span></td>
+      <td class="param-desc">14 US magnetic observatories only (BOU, BRW, CMO, DED, FRD, FRN, GUA, HON,
+      NEW, SHU, SIT, SJG, TUC, plus historical sites). Foreign stations in the selector are automatically
+      excluded when USGS is active.</td></tr>
+  <tr><td><span class="param-name">Cadence</span></td>
+      <td class="param-desc">Fixed at 1-minute (fs ≈ 0.0167 Hz). Nyquist limit ≈ 8.3 mHz — Pc5 and the
+      very bottom of Pc4 only.</td></tr>
+  <tr><td><span class="param-name">Components</span></td>
+      <td class="param-desc">H (horizontal intensity), D (declination), Z (vertical). The component selector
+      maps directly to the USGS API's <code>elements</code> parameter.</td></tr>
+  <tr><td><span class="param-name">Data lag</span></td>
+      <td class="param-desc">Typically available through yesterday. The date picker caps at yesterday.</td></tr>
+  <tr><td><span class="param-name">Format</span></td>
+      <td class="param-desc">JSON via the USGS web service
+      (<code>geomag.usgs.gov/ws/data/</code>). 24 hours of 1-min data per request per station,
+      fetched in parallel. No proxy needed — the API allows cross-origin requests.</td></tr>
+  <tr><td><span class="param-name">Fill &amp; gaps</span></td>
+      <td class="param-desc">Stations below 85% data fill for the requested window are flagged ⚠ in
+      the dropdown. The fill fraction is based on sample count vs. expected 1440 samples/day.</td></tr>
+</table>
 
 <h3>SuperMAG Ground Network</h3>
 <p>
   Fetches from the <a href="https://supermag.jhuapl.edu/" target="_blank">SuperMAG</a> global archive
-  (JHU/APL). Provides genuinely independent per-station data for hundreds of ground magnetometers
-  worldwide, enabling coherence analysis across much larger baselines and higher latitudes.
-  Requires a free SuperMAG user ID (enter it in the <strong>SuperMAG ID</strong> field).
-  Data has a ~60-day processing lag, so today's date will return nothing — the date picker
-  automatically caps to the valid range.
+  (Johns Hopkins University/APL). SuperMAG aggregates, quality-controls, and baseline-corrects data
+  from 300+ ground magnetometer networks worldwide into a common format.
+  Requires a free <a href="https://supermag.jhuapl.edu/info/?page=license" target="_blank">SuperMAG user ID</a>.
 </p>
-<p>
-  SuperMAG supports both <strong>1-minute</strong> and <strong>1-second</strong> cadence. Use 1-sec
-  for Pc3 and Pc4 pulsations (&gt;6.7 mHz), since 1-minute data can only resolve up to ~8.3 mHz
-  (the Nyquist limit).
-</p>
+<table class="param-table">
+  <tr><th>Detail</th><th></th></tr>
+  <tr><td><span class="param-name">Coverage</span></td>
+      <td class="param-desc">~300 stations globally including polar, auroral, mid-latitude, and equatorial
+      sites. Use <strong>🛰 Discover</strong> (dropdown → Discover button) to query which stations actually
+      returned data at your chosen date — the result set varies by date and cadence.</td></tr>
+  <tr><td><span class="param-name">Cadence</span></td>
+      <td class="param-desc"><strong>1-minute</strong> fetches 6 hours (360 samples). Nyquist ≈ 8.3 mHz.
+      <strong>1-second</strong> fetches 30 minutes (1800 samples). Nyquist = 500 mHz, covering the full
+      Pc3–Pc5 band. Use 1-sec for Pc3 (&gt;22 mHz) and Pc4 (&gt;6.7 mHz).</td></tr>
+  <tr><td><span class="param-name">Components</span></td>
+      <td class="param-desc">N (geographic north), E (geographic east), Z (vertical down) — the NEC
+      coordinate system. The component selector maps H→N, D→E, Z→Z.</td></tr>
+  <tr><td><span class="param-name">Data lag</span></td>
+      <td class="param-desc">~60-day processing lag — SuperMAG applies a Quiet Daily Variation (QDV)
+      baseline subtraction that requires data from surrounding days, so recent data is not yet available.
+      The date picker enforces a 60-day cutoff.</td></tr>
+  <tr><td><span class="param-name">Proxy required</span></td>
+      <td class="param-desc">The SuperMAG API does not allow cross-origin browser requests. Run
+      <code>python3 proxy.py</code> to serve the app on port 8080 — the proxy forwards
+      <code>/api/supermag</code> requests server-side and filters the response to the requested stations
+      (SuperMAG always returns the full network regardless of the <code>station=</code> parameter).</td></tr>
+</table>
 
 <h3>NOAA SWPC Solar Wind (7-day / 1-day)</h3>
 <p>
-  Fetches DSCOVR solar-wind Bz data from NOAA. All station signals are <em>derived</em> from this
-  single base series using per-station delay, amplitude scaling, and noise — it is a <strong>modelled</strong>
-  signal, not independent per-station data. Coherence will be artificially high. Useful for testing
-  the pipeline but not for scientific analysis.
+  Fetches <strong>DSCOVR</strong> solar-wind Bz data from the NOAA SWPC real-time feed. DSCOVR is a
+  satellite at the Sun–Earth L1 Lagrange point, ~1.5 million km upstream, measuring the interplanetary
+  magnetic field before it reaches Earth.
 </p>
+<table class="param-table">
+  <tr><th>Detail</th><th></th></tr>
+  <tr><td><span class="param-name">Source</span></td>
+      <td class="param-desc">Single IMF Bz time series from DSCOVR/MAGNETOMETER, not ground magnetometers.
+      All "station" signals are derived from this one series.</td></tr>
+  <tr><td><span class="param-name">Cadence</span></td>
+      <td class="param-desc">~1-minute. 7-day feed: last 7 days. 1-day feed: last 24 hours.</td></tr>
+  <tr><td><span class="param-name">Why modeled</span></td>
+      <td class="param-desc">Per-station signals are synthesised by applying a per-station delay
+      (proportional to the station's phase offset), amplitude scaling, and 45% RMS Gaussian noise to the
+      Bz series. The resulting coherence is an artefact of this construction — it reflects the model, not
+      independent geophysical observations. <strong>Do not use for scientific coherence analysis.</strong></td></tr>
+  <tr><td><span class="param-name">Auto-refresh</span></td>
+      <td class="param-desc">The ⟳ Auto-refresh button is only available for SWPC sources. It re-runs the
+      analysis every 60 seconds so the coherogram tracks current solar-wind conditions in near-real time.</td></tr>
+</table>
 
 <h3>Synthetic Substorm</h3>
 <p>
-  Generates synthetic signals locally in the browser using a seeded random number generator.
-  Injects Pc3, Pc4, and Pc5 tones at known frequencies and times so you can verify the
-  pipeline is detecting the right bands. Always available, instant, reproducible.
+  Generates synthetic signals locally in the browser using a seeded (reproducible) random-number
+  generator. Designed for pipeline testing and demonstration — the injected signals have known
+  frequencies and timing, so you can verify the coherogram is detecting the right bands.
 </p>
+<table class="param-table">
+  <tr><th>Detail</th><th></th></tr>
+  <tr><td><span class="param-name">Signal length</span></td>
+      <td class="param-desc">7200 samples at fs = 1 Hz (2 hours).</td></tr>
+  <tr><td><span class="param-name">Injected tones</span></td>
+      <td class="param-desc">
+        Pc5 (5 mHz) — ramps in at t = 30 min, persists to end.<br>
+        Pc4 (12 mHz) — continuous throughout.<br>
+        Pc3 (33 mHz) — present only between t = 60–90 min.<br>
+        Substorm impulse (8 mHz) — decaying sinusoid at t = 45 min.
+      </td></tr>
+  <tr><td><span class="param-name">Per-station variation</span></td>
+      <td class="param-desc">Each station gets a deterministic phase shift and amplitude scale derived from
+      its <code>phaseOffset</code> and <code>ampScale</code> metadata, seeded by the IAGA code character
+      value. Results are identical across runs.</td></tr>
+</table>
 
 <!-- ══════════════════════════════════ PARAMETERS ══════════════════════════════════ -->
 <h2>Toolbar Parameters</h2>
@@ -189,25 +257,29 @@ code { font-family: 'Consolas','Fira Mono',monospace; font-size: 12px; backgroun
     <td class="param-desc">
       Length of each analysis window in <strong>samples</strong>. The hint (e.g. "30 min") shows the
       equivalent real time given the current cadence. Longer slices give better frequency resolution
-      but fewer time points. At 1-min cadence, 30 samples = 30 minutes; at 1-sec cadence, 600 samples
-      = 600 seconds = 10 minutes. The number of Welch sub-segments (and thus statistical power) also
-      depends on this.
+      (Δf = fs / N) but fewer time points in the coherogram. At 1-min cadence, 30 samples = 30 minutes;
+      at 1-sec cadence, 600 samples = 10 minutes. The number of Welch sub-segments K — and thus the
+      statistical power of each coherence estimate — also scales with Slice.
     </td>
   </tr>
   <tr>
     <td><span class="param-name">Step</span></td>
     <td class="param-desc">
       Hop size between successive windows in <strong>samples</strong>. Smaller steps give finer
-      temporal resolution in the coherogram but increase computation time. The hint shows the
-      equivalent real time.  Steps smaller than Slice/2 produce overlapping windows.
+      temporal resolution but increase computation time. <strong>Step must be ≤ Slice</strong> — a
+      larger step would leave gaps in temporal coverage (data between windows is never analysed).
+      The UI enforces this automatically. Step = Slice gives non-overlapping windows; Step = Slice/2
+      gives 50% overlap, which is standard for Welch-based analysis and improves temporal continuity.
     </td>
   </tr>
   <tr>
     <td><span class="param-name">Max freq</span></td>
     <td class="param-desc">
-      Upper frequency limit displayed on the coherogram y-axis (mHz). The actual resolvable maximum
-      is the Nyquist frequency (500 mHz at 1-sec, 8.3 mHz at 1-min). Setting Max below Nyquist
-      zooms the coherogram into the ULF band of interest.
+      Upper frequency limit for the coherogram y-axis (mHz). The default of <strong>100 mHz</strong>
+      is the scientific ceiling of the Pc3 band — the highest ULF frequency this tool targets.
+      The actual display maximum is automatically clamped to the Nyquist frequency of the data
+      (8.3 mHz at 1-min cadence, 500 mHz at 1-sec cadence), so setting it higher than Nyquist
+      has no effect. Set it lower to zoom into a specific band, e.g. 10 mHz to focus on Pc5.
     </td>
   </tr>
   <tr>
@@ -235,16 +307,26 @@ code { font-family: 'Consolas','Fira Mono',monospace; font-size: 12px; backgroun
 <!-- ══════════════════════════════════ STATIONS ══════════════════════════════════ -->
 <h2>Station Selection</h2>
 <p>
-  Click any station pill in the station bar to toggle it on or off. Active stations are
-  colour-highlighted; unavailable stations (wrong source or missing IAGA code) are dimmed and
-  non-interactive. After an analysis run, stations that returned no data at the chosen date are
-  shown struck-through.
+  Click the station summary button (shows e.g. <em>BOU, FRD, CMO +3 ▾</em>) to open the station
+  dropdown. Check or uncheck stations in the scrollable list; use the filter box to search by IAGA
+  code or name. <strong>All</strong> and <strong>None</strong> buttons apply to the filtered subset.
+  A minimum of 2 stations is always required.
 </p>
 <p>
-  You can add any station by typing its <strong>IAGA code</strong> (e.g. <code>LER</code> for
-  Lerwick) into the "Add IAGA…" box. If the station's coordinates are not in the built-in list,
-  you can supply them as <code>CODE lat lon Name</code> (e.g. <code>LER 60.1 -1.2 Lerwick</code>)
-  so it appears correctly on the globe.
+  Stations unavailable for the current source are greyed out and unselectable. After an analysis
+  run, stations that returned no data at the chosen date appear struck-through; stations with less
+  than 85% data fill are flagged ⚠.
+</p>
+<p>
+  <strong>SuperMAG:</strong> click <strong>🛰 Discover</strong> (visible inside the dropdown when
+  SuperMAG is selected) to probe which stations actually have data at the chosen date. The full
+  station list is populated into the dropdown and all discovered stations are selected.
+</p>
+<p>
+  You can add any station by typing its <strong>IAGA code</strong> (e.g. <code>LER</code>) into
+  the "Add IAGA code…" box at the bottom of the dropdown. Supply coordinates as
+  <code>CODE lat lon Name</code> (e.g. <code>LER 60.1 -1.2 Lerwick</code>) to place it correctly
+  on the globe.
 </p>
 <p>
   The active station set and all toolbar settings are saved to the URL hash and to

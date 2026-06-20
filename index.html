@@ -1857,14 +1857,20 @@ function removeCustomStation(id){
 // ═══════════════════════════════════════════════════════════
 function updateSliceHints(){
   const cadSec=parseInt(document.getElementById('cadenceSel').value)||60;
+  const slEl=document.getElementById('sliceLen'), stEl=document.getElementById('stepSize');
+  // Enforce step ≤ slice: a step larger than the window leaves unanalysed gaps
+  const slVal=parseInt(slEl.value)||0;
+  const stVal=parseInt(stEl.value)||0;
+  if(slVal>0&&stVal>slVal){ stEl.value=slVal; }
+  stEl.max=slVal||stEl.max;
   const fmt=s=>{
     const v=parseInt(s); if(!v) return '';
     const tot=v*cadSec;
     return tot>=3600?`(${(tot/3600).toFixed(1)} h)`:tot>=60?`(${Math.round(tot/60)} min)`:`(${tot} s)`;
   };
   const sh=document.getElementById('sliceHint'), sth=document.getElementById('stepHint');
-  if(sh) sh.textContent=fmt(document.getElementById('sliceLen').value);
-  if(sth) sth.textContent=fmt(document.getElementById('stepSize').value);
+  if(sh) sh.textContent=fmt(slEl.value);
+  if(sth) sth.textContent=fmt(stEl.value);
 }
 
 function updateSliceRanges(){

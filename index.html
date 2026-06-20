@@ -148,7 +148,8 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI
 .pill-warn { box-shadow: 0 0 0 2px var(--warn) !important; }
 .pill-remove { margin-left:4px; opacity:0.5; font-size:10px; cursor:pointer; }
 .pill-remove:hover { opacity:1; }
-.toolbar input[type=date] { width:126px; }
+.toolbar input[type=datetime-local] { width:160px; }
+.pill-nodata { opacity:0.3; text-decoration:line-through; }
 
 /* ── Coherogram mode buttons ── */
 .coh-mode-btns { display:flex; gap:3px; }
@@ -190,10 +191,10 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI
     </select>
   </div>
   <div class="tg">
-    <label>Date</label>
-    <input type="date" id="datePick">
+    <label>Date / Time</label>
+    <input type="datetime-local" id="datePick">
   </div>
-  <div class="tg">
+  <div class="tg" id="cadenceGroup">
     <label>Cadence</label>
     <select id="cadenceSel" style="min-width:auto">
       <option value="60">1-min</option>
@@ -207,17 +208,25 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI
   <div class="tg">
     <label>Slice</label>
     <input type="number" id="sliceLen" value="600" min="120" max="3600" step="60">
-    <span style="color:var(--text-dim);font-size:11px">s</span>
+    <span style="color:var(--text-dim);font-size:11px">s</span><span id="sliceHint" style="color:var(--text-dim);font-size:10px;margin-left:3px"></span>
   </div>
   <div class="tg">
     <label>Step</label>
     <input type="number" id="stepSize" value="60" min="10" max="600" step="10">
-    <span style="color:var(--text-dim);font-size:11px">s</span>
+    <span style="color:var(--text-dim);font-size:11px">s</span><span id="stepHint" style="color:var(--text-dim);font-size:10px;margin-left:3px"></span>
   </div>
   <div class="tg">
     <label>Max</label>
     <input type="number" id="maxFreq" value="50" min="5" max="100" step="5">
     <span style="color:var(--text-dim);font-size:11px">mHz</span>
+  </div>
+  <div class="tg" id="componentGroup">
+    <label title="Geomagnetic field component to analyze">Component</label>
+    <select id="componentSel" style="min-width:auto">
+      <option value="H">H/N (horiz)</option>
+      <option value="D">D/E (declin)</option>
+      <option value="Z">Z (vert)</option>
+    </select>
   </div>
   <div class="toolbar-sep"></div>
   <label class="chk-label"><input type="checkbox" id="sigMaskChk"> Significance mask</label>
@@ -245,6 +254,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI
 <!-- ══ METRICS ══ -->
 <div class="metrics-bar">
   <div class="mc"><div class="mc-label">Samples</div><span class="mc-value" id="mSamples">—</span></div>
+  <div class="mc"><div class="mc-label">Data Window</div><span class="mc-value" id="mWindow">—</span></div>
   <div class="mc"><div class="mc-label">Time Slices</div><span class="mc-value" id="mSlices">—</span></div>
   <div class="mc"><div class="mc-label">Station Pairs</div><span class="mc-value" id="mPairs">—</span></div>
   <div class="mc"><div class="mc-label">Peak ULF</div><span class="mc-value" id="mPeakFreq">—</span><span class="mc-unit">mHz</span></div>
@@ -338,7 +348,10 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI
     <!-- Panel 4: Globe -->
     <div class="panel" id="panel4">
       <div class="globe-panel">
-        <canvas id="globeCanvas" width="360" height="360"></canvas>
+        <div style="position:relative;display:inline-flex;flex-direction:column;align-items:center;gap:6px">
+          <canvas id="globeCanvas" width="360" height="360"></canvas>
+          <button id="globeResetBtn" class="btn btn-secondary" onclick="resetGlobeView()" style="display:none;font-size:11px">⟲ Reset view</button>
+        </div>
         <div class="globe-legend">
           <h3>Station Network</h3>
           <div id="globeStationLegend"></div>
@@ -447,7 +460,7 @@ const URLS = {
 //   - Response is "OK\n[JSON array]" — strip the status line before parsing
 //   - Data lags ~6 weeks; use 60+ days back to ensure availability
 const SUPERMAG_API='/api/supermag'; // proxied by proxy.py to supermag.jhuapl.edu
-const SUPERMAG_COMPONENT='N'; // geomagnetic-north component (nT)
+// Component is read from #componentSel at fetch time so it can be changed without re-loading
 
 // Fetch real, independent per-station time series from SuperMAG.
 // date: YYYY-MM-DD string or null (defaults to 60 days back); cadenceReqSec: 60 or 1.
@@ -455,13 +468,17 @@ const SUPERMAG_COMPONENT='N'; // geomagnetic-north component (nT)
 async function fetchSuperMag(stations, userid, date, cadenceReqSec){
   if(!userid){ setStatus('warn','SuperMAG needs a user ID — synthetic fallback'); return null; }
   try {
-    // Use provided date or default 60 days back (SuperMAG ~6-week ingestion lag).
-    const d=date ? new Date(date+'T00:00:00Z') : new Date(Date.now()-60*86400000);
-    const start=`${d.getUTCFullYear()}${String(d.getUTCMonth()+1).padStart(2,'0')}${String(d.getUTCDate()).padStart(2,'0')}`;
+    // Use provided datetime or default 60 days back (SuperMAG ~6-week ingestion lag).
+    // SuperMAG start param accepts YYYYMMDDHHMM for sub-daily positioning.
+    const dtStr = date || new Date(Date.now()-60*86400000).toISOString().slice(0,16);
+    const start = dtStr.replace(/-/g,'').replace('T','').replace(':','').slice(0,12);
     const use1sec=cadenceReqSec===1;
     const extent=use1sec?1800:21600; // 30 min for 1-sec, 6 h for 1-min
     const deltaParam=use1sec?'&delta=s':'';
     const stationIds=stations.map(s=>s.id).join(',');
+    // Map component selector to SuperMAG field: H→N (geographic north), D→E, Z→Z
+    const compSel=document.getElementById('componentSel')?.value||'H';
+    const smComp=compSel==='Z'?'Z':compSel==='D'?'E':'N';
     const url=`${SUPERMAG_API}?fmt=json&logon=${encodeURIComponent(userid)}&start=${start}&extent=${extent}&mag${deltaParam}&_stations=${stationIds}`;
     const r=await fetch(url);
     if(!r.ok) throw new Error('HTTP '+r.status);
@@ -479,7 +496,7 @@ async function fetchSuperMag(stations, userid, date, cadenceReqSec){
     }
     const sigs={}, cadences=[];
     for(const s of stations){
-      const {values,times}=parseSuperMagSeries(byStation[s.id]||[],SUPERMAG_COMPONENT);
+      const {values,times}=parseSuperMagSeries(byStation[s.id]||[],smComp);
       if(values.length>=128){
         sigs[s.id]=new Float64Array(values);
         const c=medianCadenceSec(times); if(c>0) cadences.push(c);
@@ -497,13 +514,16 @@ async function fetchSuperMag(stations, userid, date, cadenceReqSec){
 // dropped. date: YYYY-MM-DD or null (defaults to yesterday).
 // Returns { sigs:{id:Float64Array}, fs, cadenceSec, extent } or null.
 const USGS_API='https://geomag.usgs.gov/ws/data/';
-const USGS_ELEMENT='H'; // horizontal intensity (nT) — classic for Pc pulsations
 async function fetchUSGS(stations, date){
+  // Map component selector to USGS element: H→H, D→D, Z→Z
+  const compSel=document.getElementById('componentSel')?.value||'H';
+  const usgsEl=compSel==='Z'?'Z':compSel==='D'?'D':'H';
   try {
     let startISO, endISO;
     if(date){
-      startISO=date+'T00:00:00Z';
-      const d2=new Date(new Date(date+'T00:00:00Z').getTime()+86400000);
+      // datetime-local value: "YYYY-MM-DDTHH:MM" — append seconds+Z for ISO
+      startISO = (date.includes('T') ? date : date+'T00:00') + ':00Z';
+      const d2=new Date(new Date(startISO).getTime()+86400000);
       endISO=d2.toISOString().slice(0,19)+'Z';
     } else {
       const end=new Date(Date.now()-2*3600000);
@@ -515,13 +535,13 @@ async function fetchUSGS(stations, date){
     const sigs={}, cadences=[];
     for(const s of stations){
       setStatus('busy',`USGS: fetching ${s.id}…`);
-      const url=`${USGS_API}?id=${encodeURIComponent(s.id)}&elements=${USGS_ELEMENT}`+
+      const url=`${USGS_API}?id=${encodeURIComponent(s.id)}&elements=${usgsEl}`+
                 `&format=json&sampling_period=60&type=variation`+
                 `&starttime=${startISO}&endtime=${endISO}`;
       let json;
       try { const r=await fetch(url); if(!r.ok) throw new Error('HTTP '+r.status); json=await r.json(); }
       catch(e){ continue; } // skip stations USGS doesn't serve / errors
-      const {values,times}=parseUSGSSeries(json,USGS_ELEMENT);
+      const {values,times}=parseUSGSSeries(json,usgsEl);
       if(values.length>=128){
         sigs[s.id]=new Float64Array(values);
         const c=medianCadenceSec(times); if(c>0) cadences.push(c);
@@ -619,6 +639,10 @@ async function runAnalysis() {
   const pickDate=document.getElementById('datePick').value||null;
   const cadenceReqSec=parseInt(document.getElementById('cadenceSel').value)||60;
 
+  // Clear pill-nodata marks from previous run
+  for(const [,pill] of Object.entries(pillEls)) pill.classList.remove('pill-nodata');
+  setMetric('mWindow','—');
+
   // Clear old spinners
   const wrap=document.getElementById('cohWrap');
   wrap.querySelectorAll('.spinner-overlay').forEach(e=>e.remove());
@@ -663,6 +687,16 @@ async function runAnalysis() {
       }
     }
     const useSynth=Object.keys(stationSigs).length<2;
+    // Mark pills for requested stations that returned no real data
+    if(!useSynth){
+      const returnedIds=new Set(Object.keys(stationSigs));
+      for(const s of requested){
+        if(!returnedIds.has(s.id)&&pillEls[s.id]){
+          pillEls[s.id].classList.add('pill-nodata');
+          pillEls[s.id].title=`${s.id}: no data at this date`;
+        }
+      }
+    }
     if(useSynth){
       spin('Generating synthetic station signals…'); await tick();
       stationSigs={}; fs=1; cadenceSec=1;
@@ -715,6 +749,8 @@ async function runAnalysis() {
     for(const s of activeList) diffSigs[s.id]=firstDifference(stationSigs[s.id]);
     const nSamples=diffSigs[activeList[0].id].length;
     setMetric('mSamples',nSamples);
+    const winSec=nSamples/fs;
+    setMetric('mWindow',winSec>=3600?`${(winSec/3600).toFixed(1)} h`:`${Math.round(winSec/60)} min`);
 
     // 4. Sliding window coherogram
     spin('Computing windowed cross-coherence…'); await tick();
@@ -827,7 +863,8 @@ async function runAnalysis() {
 
     const warnCount=warnStations.size;
     const warnNote=warnCount?` · ${warnCount} ⚠`:'';
-    const label=useSynth?'synthetic substorm':(src==='supermag'?`SuperMAG (${activeList.length} stations${warnNote})`:src==='usgs'?`USGS (${activeList.length} stations${warnNote})`:`NOAA SWPC (${src})`);
+    const stationNote=useSynth?'':`${activeList.length}/${requested.length} stations${warnNote}`;
+    const label=useSynth?'synthetic substorm':(src==='supermag'?`SuperMAG (${stationNote})`:src==='usgs'?`USGS (${stationNote})`:`NOAA SWPC (${src})`);
     setStatus('ok',`Complete — ${nTimes} slices · ${events.length} event${events.length!==1?'s':''} detected · ${label}`);
   } catch(e) {
     wrap.querySelectorAll('.spinner-overlay').forEach(el=>el.remove());
@@ -915,6 +952,18 @@ function renderCoherogram(r) {
   ctx.save(); ctx.translate(9,H/2); ctx.rotate(-Math.PI/2);
   ctx.fillStyle='#889'; ctx.font='10px sans-serif'; ctx.textAlign='center';
   ctx.fillText('Freq (mHz)',0,0); ctx.restore();
+
+  // Pc-band gridlines at Pc4/Pc5 (6.7 mHz) and Pc3/Pc4 (22 mHz) boundaries
+  const maxFHz2=ulfFreqs[ulfFreqs.length-1];
+  ctx.save(); ctx.setLineDash([4,4]); ctx.lineWidth=1;
+  for(const [fHz,label] of [[0.0067,'Pc5|Pc4'],[0.022,'Pc4|Pc3']]){
+    if(fHz>maxFHz2*1.02) continue;
+    const py=H-Math.round((fHz/maxFHz2)*H);
+    ctx.strokeStyle='rgba(200,200,255,0.28)'; ctx.beginPath(); ctx.moveTo(46,py); ctx.lineTo(W,py); ctx.stroke();
+    ctx.fillStyle='rgba(200,200,255,0.55)'; ctx.font='9px monospace'; ctx.textAlign='right';
+    ctx.fillText(label,W-3,Math.max(10,Math.min(H-3,py-2)));
+  }
+  ctx.restore();
 
   // Time axis
   ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(0,H-15,W,15);
@@ -1120,11 +1169,16 @@ function renderMatrix(r){
     const [rv,gv,bv]=infernoRGB(matrixMean[i][j]);
     ctx.fillStyle=`rgb(${rv},${gv},${bv})`;
     ctx.fillRect(PAD+j*CELL,i*CELL,CELL,CELL);
-    ctx.fillStyle=matrixMean[i][j]>0.55?'#111':'#eee';
-    ctx.font='bold 11px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(matrixMean[i][j].toFixed(2),PAD+j*CELL+CELL/2,i*CELL+CELL/2);
-    // Click hint for off-diagonal cells with pair data
-    if(i!==j){
+    const textColor=matrixMean[i][j]>0.55?'#111':'#eee';
+    ctx.fillStyle=textColor; ctx.textAlign='center'; ctx.textBaseline='middle';
+    if(i===j){
+      ctx.font='bold 11px monospace';
+      ctx.fillText(matrixMean[i][j].toFixed(2),PAD+j*CELL+CELL/2,i*CELL+CELL/2);
+    } else {
+      ctx.font='bold 11px monospace';
+      ctx.fillText(matrixMean[i][j].toFixed(2),PAD+j*CELL+CELL/2,i*CELL+CELL/2-6);
+      const km=haversinKm(activeList[i].lat,activeList[i].lon,activeList[j].lat,activeList[j].lon);
+      if(km!=null){ctx.font='9px monospace';ctx.fillText(`${Math.round(km)} km`,PAD+j*CELL+CELL/2,i*CELL+CELL/2+8);}
       const pk=i<j?`${activeList[i].id}:${activeList[j].id}`:`${activeList[j].id}:${activeList[i].id}`;
       if(pairCohMap&&pairCohMap[pk]){
         ctx.font='8px sans-serif'; ctx.fillStyle='rgba(255,255,255,0.35)';
@@ -1167,6 +1221,8 @@ function renderMatrix(r){
 //  RENDER: STATION GLOBE
 // ═══════════════════════════════════════════════════════════
 let globeCenter=[50,-125]; // viewpoint [lat, lon] — recentered on active stations
+let globeUserCenter=null;  // [lat,lon] when user has dragged; null = auto-centroid
+let globeDrag=null;        // {x,y,lat,lon} of drag start
 const DEG=Math.PI/180;
 
 // Centroid of a set of stations (handles longitude wrap), so the globe view
@@ -1212,7 +1268,8 @@ function greatCirclePts(lat1,lon1,lat2,lon2,n=60){
 let globePhase=0;
 function startGlobe(r){
   if(globeAnimId) cancelAnimationFrame(globeAnimId);
-  globeCenter=stationCentroid(r.activeList);
+  // Preserve manual rotation across re-runs; reset only if not yet dragged
+  globeCenter=globeUserCenter??stationCentroid(r.activeList);
   buildGlobeLegend(r);
   function loop(){
     globePhase+=0.018;
@@ -1220,6 +1277,12 @@ function startGlobe(r){
     globeAnimId=requestAnimationFrame(loop);
   }
   loop();
+}
+function resetGlobeView(){
+  globeUserCenter=null;
+  if(lastResult) globeCenter=stationCentroid(lastResult.activeList);
+  const btn=document.getElementById('globeResetBtn');
+  if(btn) btn.style.display='none';
 }
 function stopGlobe(){if(globeAnimId){cancelAnimationFrame(globeAnimId);globeAnimId=null;}}
 
@@ -1457,7 +1520,28 @@ function syncPillsToSource(src){
     else pill.className='station-pill'+(isOn?' active':'');
     pill.style.cssText=isAvail?(isOn?styleOn:styleOff):'';
   });
+  // Cadence selector only meaningful for SuperMAG
+  const cg=document.getElementById('cadenceGroup');
+  if(cg) cg.style.display=src==='supermag'?'':'none';
+  syncDatePickerToSource(src);
   saveSettings();
+}
+
+function syncDatePickerToSource(src){
+  const dp=document.getElementById('datePick');
+  const now=Date.now();
+  if(src==='supermag'){
+    const maxDt=new Date(now-60*86400000).toISOString().slice(0,16);
+    dp.max=maxDt;
+    if(!dp.value||dp.value>maxDt) dp.value=maxDt;
+  } else if(src==='usgs'){
+    const maxDt=new Date(now-86400000).toISOString().slice(0,16);
+    dp.max=maxDt;
+    if(!dp.value||dp.value>maxDt) dp.value=maxDt;
+  } else {
+    dp.max='';
+    if(!dp.value) dp.value=new Date(now-3600000).toISOString().slice(0,16);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1467,7 +1551,7 @@ function setProvBadge(useSynth,src,cadenceSec,date){
   const el=document.getElementById('provBadge'); if(!el) return;
   if(useSynth){ el.textContent='SYNTHETIC · fs=1 Hz'; el.className='prov-badge synth'; }
   else {
-    const dateStr=date?` · ${date}`:'';
+    const dateStr=date?` · ${date.replace('T',' ')}`:'';
     el.textContent=`REAL · ${src} · ${cadenceSec}s cadence${dateStr}`;
     el.className='prov-badge real';
   }
@@ -1516,6 +1600,7 @@ function collectSettings(){
     stations:Array.from(activeStations),
     date:document.getElementById('datePick').value,
     cadence:document.getElementById('cadenceSel').value,
+    component:document.getElementById('componentSel').value,
     customStations:customStationList.map(s=>({id:s.id,name:s.name,lat:s.lat,lon:s.lon,color:s.color})),
   };
 }
@@ -1529,6 +1614,7 @@ function applySettings(s){
   if(s.sigMask!=null) document.getElementById('sigMaskChk').checked=!!s.sigMask;
   if(s.date!=null) document.getElementById('datePick').value=s.date;
   if(s.cadence!=null) document.getElementById('cadenceSel').value=s.cadence;
+  if(s.component!=null) document.getElementById('componentSel').value=s.component;
   if(Array.isArray(s.customStations)){
     for(const cs of s.customStations){
       if(!STATIONS.some(st=>st.id===cs.id)) addCustomStationEntry(cs);
@@ -1714,6 +1800,34 @@ function removeCustomStation(id,pill){
 }
 
 // ═══════════════════════════════════════════════════════════
+//  SLICE/STEP HINTS
+// ═══════════════════════════════════════════════════════════
+function updateSliceHints(){
+  const fmtSec=s=>{const v=parseInt(s);return v>=120?`(${Math.round(v/60)} min)`:v>=60?'(1 min)':'';};
+  const sh=document.getElementById('sliceHint'), sth=document.getElementById('stepHint');
+  if(sh) sh.textContent=fmtSec(document.getElementById('sliceLen').value);
+  if(sth) sth.textContent=fmtSec(document.getElementById('stepSize').value);
+}
+
+function updateSliceRanges(){
+  const is1sec=document.getElementById('cadenceSel').value==='1';
+  const sl=document.getElementById('sliceLen'), st=document.getElementById('stepSize');
+  if(is1sec){sl.min=60;sl.max=3600;sl.step=30;st.min=10;st.max=600;st.step=10;}
+  else{sl.min=120;sl.max=21600;sl.step=60;st.min=60;st.max=3600;st.step=60;}
+  updateSliceHints();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  HAVERSINE DISTANCE
+// ═══════════════════════════════════════════════════════════
+function haversinKm(lat1,lon1,lat2,lon2){
+  if(lat1==null||lat2==null) return null;
+  const R=6371, dLat=(lat2-lat1)*DEG, dLon=(lon2-lon1)*DEG;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*DEG)*Math.cos(lat2*DEG)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// ═══════════════════════════════════════════════════════════
 //  GLOBE: skip stations without coordinates
 // ═══════════════════════════════════════════════════════════
 // (handled inline in drawGlobe — stations with lat===null are skipped)
@@ -1733,19 +1847,67 @@ window.addEventListener('resize',()=>{
 // ═══════════════════════════════════════════════════════════
 applySettings(loadSettings());            // URL hash > localStorage > defaults
 
-// Set date picker default (60 days back, safe for SuperMAG) if not restored from settings
-if(!document.getElementById('datePick').value){
-  const d=new Date(Date.now()-60*86400000);
-  document.getElementById('datePick').value=`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
-}
-
 buildStationPills();                       // reflects restored activeStations
 syncPillsToSource(document.getElementById('srcSelect').value); // dim/enable by source
 document.getElementById('srcSelect').addEventListener('change',function(){
   syncPillsToSource(this.value);
 });
-['supermagUser','sliceLen','stepSize','maxFreq','sigMaskChk','datePick','cadenceSel']
+
+// Slice/step hints and range updates on cadence change
+document.getElementById('cadenceSel').addEventListener('change', updateSliceRanges);
+document.getElementById('sliceLen').addEventListener('input', updateSliceHints);
+document.getElementById('stepSize').addEventListener('input', updateSliceHints);
+updateSliceRanges(); // set initial hints
+
+['supermagUser','sliceLen','stepSize','maxFreq','sigMaskChk','datePick','cadenceSel','componentSel']
   .forEach(id=>document.getElementById(id).addEventListener('change',saveSettings));
+
+// Globe rotation via mouse drag
+(function(){
+  const gc=document.getElementById('globeCanvas');
+  gc.style.cursor='grab';
+  gc.addEventListener('mousedown',e=>{
+    globeDrag={x:e.offsetX,y:e.offsetY,lat:globeCenter[0],lon:globeCenter[1]};
+    gc.style.cursor='grabbing';
+    e.preventDefault();
+  });
+  gc.addEventListener('mousemove',e=>{
+    if(!globeDrag) return;
+    const sens=90/170;
+    globeUserCenter=[
+      Math.max(-85,Math.min(85,globeDrag.lat-(e.offsetY-globeDrag.y)*sens)),
+      globeDrag.lon+(e.offsetX-globeDrag.x)*sens
+    ];
+    globeCenter=globeUserCenter;
+    const btn=document.getElementById('globeResetBtn');
+    if(btn) btn.style.display='';
+  });
+  const endDrag=()=>{globeDrag=null; gc.style.cursor='grab';};
+  gc.addEventListener('mouseup',endDrag);
+  gc.addEventListener('mouseleave',endDrag);
+  // Touch support
+  gc.addEventListener('touchstart',e=>{
+    const t=e.touches[0], r=gc.getBoundingClientRect();
+    globeDrag={x:t.clientX-r.left,y:t.clientY-r.top,lat:globeCenter[0],lon:globeCenter[1]};
+    e.preventDefault();
+  },{passive:false});
+  gc.addEventListener('touchmove',e=>{
+    if(!globeDrag) return;
+    const t=e.touches[0], r=gc.getBoundingClientRect();
+    const ox=t.clientX-r.left, oy=t.clientY-r.top;
+    const sens=90/170;
+    globeUserCenter=[
+      Math.max(-85,Math.min(85,globeDrag.lat-(oy-globeDrag.y)*sens)),
+      globeDrag.lon+(ox-globeDrag.x)*sens
+    ];
+    globeCenter=globeUserCenter;
+    const btn=document.getElementById('globeResetBtn');
+    if(btn) btn.style.display='';
+    e.preventDefault();
+  },{passive:false});
+  gc.addEventListener('touchend',()=>{globeDrag=null;});
+})();
+
 drawColorbar(null);
 setStatus('','Ready — select a data source and press Run Analysis');
 setupCoherogramInteraction();

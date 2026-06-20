@@ -175,6 +175,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI
   <span class="prov-badge" id="provBadge" title="Data provenance">—</span>
   <div class="hdr-sep"></div>
   <span style="font-size:11px;color:var(--text-dim)">Pc3–Pc5 · 2–50 mHz</span>
+  <a href="about.html" target="_blank" style="font-size:11px;color:var(--text-dim);text-decoration:none;border:1px solid var(--border);border-radius:4px;padding:2px 8px;margin-left:4px" title="About & User Guide">ℹ About</a>
 </div>
 
 <!-- ══ TOOLBAR ══ -->
@@ -208,12 +209,12 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI
   <div class="tg">
     <label>Slice</label>
     <input type="number" id="sliceLen" value="600" min="120" max="3600" step="60">
-    <span style="color:var(--text-dim);font-size:11px">s</span><span id="sliceHint" style="color:var(--text-dim);font-size:10px;margin-left:3px"></span>
+    <span id="sliceUnit" style="color:var(--text-dim);font-size:11px">s</span><span id="sliceHint" style="color:var(--text-dim);font-size:10px;margin-left:3px"></span>
   </div>
   <div class="tg">
     <label>Step</label>
     <input type="number" id="stepSize" value="60" min="10" max="600" step="10">
-    <span style="color:var(--text-dim);font-size:11px">s</span><span id="stepHint" style="color:var(--text-dim);font-size:10px;margin-left:3px"></span>
+    <span id="stepUnit" style="color:var(--text-dim);font-size:11px">s</span><span id="stepHint" style="color:var(--text-dim);font-size:10px;margin-left:3px"></span>
   </div>
   <div class="tg">
     <label>Max</label>
@@ -1818,16 +1819,19 @@ function updateSliceHints(){
 function updateSliceRanges(){
   const is1min=document.getElementById('cadenceSel').value==='60';
   const sl=document.getElementById('sliceLen'), st=document.getElementById('stepSize');
+  const su=document.getElementById('sliceUnit'), stu=document.getElementById('stepUnit');
   if(is1min){
     sl.min=5; sl.max=360; sl.step=5;
     st.min=1; st.max=60;  st.step=1;
     if(parseInt(sl.value)>360||parseInt(sl.value)<5) sl.value=30;
     if(parseInt(st.value)>60 ||parseInt(st.value)<1) st.value=6;
+    if(su) su.textContent='smp'; if(stu) stu.textContent='smp';
   } else {
     sl.min=60; sl.max=3600; sl.step=30;
     st.min=10; st.max=600;  st.step=10;
     if(parseInt(sl.value)>3600||parseInt(sl.value)<60) sl.value=600;
     if(parseInt(st.value)>600 ||parseInt(st.value)<10) st.value=60;
+    if(su) su.textContent='s'; if(stu) stu.textContent='s';
   }
   updateSliceHints();
 }

@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>About — Global Magnetometer Network Coherogram</title>
+<style>
+:root {
+  --bg: #0a0c12; --surface: #111520; --surface2: #161b27;
+  --border: #1f2a3c; --accent: #4f9cf9; --accent2: #7b5cf9;
+  --text: #d4ddf0; --text-dim: #7a8aaa;
+  --success: #3ecf8e; --warn: #f9a825; --danger: #f05050;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI',system-ui,sans-serif; font-size: 14px; line-height: 1.65; }
+
+.page-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 32px; display: flex; align-items: center; gap: 14px; }
+.page-header h1 { font-size: 16px; font-weight: 700; }
+.page-header .back { font-size: 12px; color: var(--accent); text-decoration: none; border: 1px solid var(--border); border-radius: 4px; padding: 3px 10px; }
+.page-header .back:hover { border-color: var(--accent); }
+
+.content { max-width: 860px; margin: 0 auto; padding: 40px 32px 80px; }
+
+h2 { font-size: 18px; font-weight: 700; color: var(--accent); margin: 44px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+h2:first-of-type { margin-top: 0; }
+h3 { font-size: 13px; font-weight: 700; color: var(--text); margin: 22px 0 6px; text-transform: uppercase; letter-spacing: 0.06em; }
+p { color: var(--text-dim); margin-bottom: 10px; }
+ul, ol { color: var(--text-dim); padding-left: 22px; margin-bottom: 12px; }
+li { margin-bottom: 5px; }
+strong { color: var(--text); font-weight: 600; }
+a { color: var(--accent); }
+
+.param-table { width: 100%; border-collapse: collapse; margin: 14px 0 24px; }
+.param-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-dim); padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.param-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.param-table td:first-child { white-space: nowrap; }
+.param-table tr:last-child td { border-bottom: none; }
+.param-name { font-family: 'Consolas','Fira Mono',monospace; font-size: 12px; color: var(--accent2); background: var(--surface2); padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+.param-desc { color: var(--text-dim); font-size: 13px; }
+
+.band-table { width: 100%; border-collapse: collapse; margin: 14px 0; }
+.band-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-dim); padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.band-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--text-dim); font-size: 13px; }
+.band-table td:first-child { font-weight: 700; color: var(--text); }
+.band-table tr:last-child td { border-bottom: none; }
+
+.tip { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 5px; padding: 10px 14px; margin: 14px 0; font-size: 13px; color: var(--text-dim); }
+.tip strong { color: var(--accent); }
+.warn-tip { border-left-color: var(--warn); }
+.warn-tip strong { color: var(--warn); }
+
+.pipeline-step { display: flex; gap: 14px; margin: 10px 0; }
+.step-num { flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--accent2); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+.step-body { flex: 1; }
+.step-body strong { color: var(--text); display: block; margin-bottom: 2px; }
+
+code { font-family: 'Consolas','Fira Mono',monospace; font-size: 12px; background: var(--surface2); padding: 1px 5px; border-radius: 3px; color: var(--accent2); }
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>🌐 Global Magnetometer Network Coherogram — User Guide</h1>
+  <div style="flex:1"></div>
+  <a class="back" href="index.html">← Back to App</a>
+</div>
+
+<div class="content">
+
+<!-- ══════════════════════════════════ OVERVIEW ══════════════════════════════════ -->
+<h2>What This Tool Does</h2>
+<p>
+  This app detects <strong>Ultra-Low Frequency (ULF) geomagnetic pulsations</strong> — tiny magnetic
+  field oscillations in the Pc3–Pc5 range (2–50 mHz, i.e. periods of 20 seconds to 8 minutes) —
+  by measuring how coherently those oscillations appear simultaneously across a network of ground
+  magnetometers.
+</p>
+<p>
+  The central output is a <strong>coherogram</strong>: a 2-D heatmap with time on the horizontal axis
+  and frequency on the vertical axis, coloured by <em>network-averaged magnitude-squared coherence γ²</em>.
+  High coherence (bright yellow in the inferno colourmap) at a given time and frequency means multiple
+  station pairs are all seeing the same oscillation at that moment — a strong indicator of a real ULF wave,
+  not local noise.
+</p>
+<p>
+  Pc pulsations are driven by solar-wind–magnetosphere coupling (Pc3–Pc4) and field-line resonances
+  tied to radiation-belt dynamics (Pc4–Pc5). Detecting them in real time or in archived data is
+  useful for space weather monitoring, radiation-belt studies, and magnetospheric sounding.
+</p>
+
+<!-- ══════════════════════════════════ QUICK START ══════════════════════════════════ -->
+<h2>Quick Start</h2>
+<ol>
+  <li>Choose a <strong>Source</strong> (USGS is the default — no account needed, US stations only).</li>
+  <li>Pick a <strong>Date / Time</strong>. USGS data is available up to yesterday; SuperMAG data has a ~60-day lag.</li>
+  <li>Select which <strong>Stations</strong> to include by clicking the pills in the station bar. Active stations are highlighted.</li>
+  <li>Press <strong>▶ Run Analysis</strong>. Real data is fetched and analysed; results appear across five tabs.</li>
+  <li>Click any cell in the coherogram to inspect the per-pair coherence spectra for that window.</li>
+</ol>
+<div class="tip">
+  <strong>Tip:</strong> Stations with no data at the chosen date appear struck-through after the analysis runs.
+  If most stations fail, try an earlier date or a different source.
+</div>
+
+<!-- ══════════════════════════════════ DATA SOURCES ══════════════════════════════════ -->
+<h2>Data Sources</h2>
+
+<h3>USGS Geomagnetism (default)</h3>
+<p>
+  Fetches real 1-minute cadence data from the <a href="https://geomag.usgs.gov/" target="_blank">USGS
+  Geomagnetism Program</a> API. No account required. Coverage is US observatories only — stations
+  outside the US are automatically dimmed and excluded. Data is typically available up to yesterday.
+  Reliable and fast; the best starting point.
+</p>
+
+<h3>SuperMAG Ground Network</h3>
+<p>
+  Fetches from the <a href="https://supermag.jhuapl.edu/" target="_blank">SuperMAG</a> global archive
+  (JHU/APL). Provides genuinely independent per-station data for hundreds of ground magnetometers
+  worldwide, enabling coherence analysis across much larger baselines and higher latitudes.
+  Requires a free SuperMAG user ID (enter it in the <strong>SuperMAG ID</strong> field).
+  Data has a ~60-day processing lag, so today's date will return nothing — the date picker
+  automatically caps to the valid range.
+</p>
+<p>
+  SuperMAG supports both <strong>1-minute</strong> and <strong>1-second</strong> cadence. Use 1-sec
+  for Pc3 and Pc4 pulsations (&gt;6.7 mHz), since 1-minute data can only resolve up to ~8.3 mHz
+  (the Nyquist limit).
+</p>
+
+<h3>NOAA SWPC Solar Wind (7-day / 1-day)</h3>
+<p>
+  Fetches DSCOVR solar-wind Bz data from NOAA. All station signals are <em>derived</em> from this
+  single base series using per-station delay, amplitude scaling, and noise — it is a <strong>modelled</strong>
+  signal, not independent per-station data. Coherence will be artificially high. Useful for testing
+  the pipeline but not for scientific analysis.
+</p>
+
+<h3>Synthetic Substorm</h3>
+<p>
+  Generates synthetic signals locally in the browser using a seeded random number generator.
+  Injects Pc3, Pc4, and Pc5 tones at known frequencies and times so you can verify the
+  pipeline is detecting the right bands. Always available, instant, reproducible.
+</p>
+
+<!-- ══════════════════════════════════ PARAMETERS ══════════════════════════════════ -->
+<h2>Toolbar Parameters</h2>
+
+<table class="param-table">
+  <tr><th>Parameter</th><th>Description</th></tr>
+  <tr>
+    <td><span class="param-name">Date / Time</span></td>
+    <td class="param-desc">
+      Start of the data window to fetch. For USGS, time-of-day is ignored and data starts at midnight.
+      For SuperMAG, the time component is used — enter e.g. <code>14:30</code> to begin a 30-minute
+      1-sec window mid-afternoon. The picker automatically enforces source-specific validity limits.
+    </td>
+  </tr>
+  <tr>
+    <td><span class="param-name">Cadence</span></td>
+    <td class="param-desc">
+      Sampling interval for SuperMAG only. <strong>1-min</strong> fetches 6 hours of data and resolves
+      frequencies up to ~8.3 mHz (Pc5 and low-Pc4). <strong>1-sec</strong> fetches ~30 minutes of data
+      and resolves up to 500 mHz, capturing the full Pc3–Pc5 range. Hidden for other sources.
+    </td>
+  </tr>
+  <tr>
+    <td><span class="param-name">SuperMAG ID</span></td>
+    <td class="param-desc">
+      Your free SuperMAG logon ID. Register at
+      <a href="https://supermag.jhuapl.edu/info/?page=license" target="_blank">supermag.jhuapl.edu</a>.
+      Only required for the SuperMAG source.
+    </td>
+  </tr>
+  <tr>
+    <td><span class="param-name">Slice</span></td>
+    <td class="param-desc">
+      Length of each analysis window in <strong>samples</strong>. The hint (e.g. "30 min") shows the
+      equivalent real time given the current cadence. Longer slices give better frequency resolution
+      but fewer time points. At 1-min cadence, 30 samples = 30 minutes; at 1-sec cadence, 600 samples
+      = 600 seconds = 10 minutes. The number of Welch sub-segments (and thus statistical power) also
+      depends on this.
+    </td>
+  </tr>
+  <tr>
+    <td><span class="param-name">Step</span></td>
+    <td class="param-desc">
+      Hop size between successive windows in <strong>samples</strong>. Smaller steps give finer
+      temporal resolution in the coherogram but increase computation time. The hint shows the
+      equivalent real time.  Steps smaller than Slice/2 produce overlapping windows.
+    </td>
+  </tr>
+  <tr>
+    <td><span class="param-name">Max freq</span></td>
+    <td class="param-desc">
+      Upper frequency limit displayed on the coherogram y-axis (mHz). The actual resolvable maximum
+      is the Nyquist frequency (500 mHz at 1-sec, 8.3 mHz at 1-min). Setting Max below Nyquist
+      zooms the coherogram into the ULF band of interest.
+    </td>
+  </tr>
+  <tr>
+    <td><span class="param-name">Component</span></td>
+    <td class="param-desc">
+      Geomagnetic field component to analyse.
+      <strong>H/N</strong> (horizontal north) is most sensitive to Pc4–Pc5 field-line resonances
+      and is the standard choice for ULF studies.
+      <strong>D/E</strong> (declination / east) detects azimuthal wave modes.
+      <strong>Z</strong> (vertical) is sensitive to ionospheric and compressional modes.
+      SuperMAG uses N/E/Z; USGS uses H/D/Z — the selector maps automatically.
+    </td>
+  </tr>
+  <tr>
+    <td><span class="param-name">Significance mask</span></td>
+    <td class="param-desc">
+      When enabled, pixels whose coherence falls below the analytic p&lt;0.05 significance threshold
+      are blacked out. The threshold (γ²<sub>crit</sub>) depends on the number of Welch segments K:
+      higher K → lower threshold → more sensitive. Shown as a triangle marker on the colourbar and
+      reported in the Sig. Threshold metric card.
+    </td>
+  </tr>
+</table>
+
+<!-- ══════════════════════════════════ STATIONS ══════════════════════════════════ -->
+<h2>Station Selection</h2>
+<p>
+  Click any station pill in the station bar to toggle it on or off. Active stations are
+  colour-highlighted; unavailable stations (wrong source or missing IAGA code) are dimmed and
+  non-interactive. After an analysis run, stations that returned no data at the chosen date are
+  shown struck-through.
+</p>
+<p>
+  You can add any station by typing its <strong>IAGA code</strong> (e.g. <code>LER</code> for
+  Lerwick) into the "Add IAGA…" box. If the station's coordinates are not in the built-in list,
+  you can supply them as <code>CODE lat lon Name</code> (e.g. <code>LER 60.1 -1.2 Lerwick</code>)
+  so it appears correctly on the globe.
+</p>
+<p>
+  The active station set and all toolbar settings are saved to the URL hash and to
+  <code>localStorage</code> automatically, so your configuration survives page refreshes and
+  can be shared by copying the URL.
+</p>
+
+<!-- ══════════════════════════════════ RESULTS TABS ══════════════════════════════════ -->
+<h2>Results Tabs</h2>
+
+<h3>🔥 Coherogram</h3>
+<p>
+  The main output. Horizontal axis is time (window centres); vertical axis is frequency (mHz);
+  colour is network-mean γ² using the <em>inferno</em> colourmap (black → purple → orange → yellow).
+  Dashed horizontal lines mark the Pc5|Pc4 boundary (6.7 mHz) and Pc4|Pc3 boundary (22 mHz).
+</p>
+<p>
+  Two display modes are available via the <strong>γ²</strong> / <strong>φ°</strong> buttons:
+  coherence magnitude (default) and circular-mean phase angle (useful for measuring propagation delays).
+  Click any cell to open a detail panel showing per-pair coherence spectra for that window.
+</p>
+
+<h3>📈 Time Series</h3>
+<p>
+  Raw (first-differenced) signal traces for each active station, stacked vertically. Useful for
+  spotting data gaps, spikes, or obvious pulsation bursts by eye before trusting the coherogram.
+</p>
+
+<h3>〜 FFT Spectra</h3>
+<p>
+  Power spectral density (Welch estimate) for each station over the full dataset. Peaks in PSD
+  at the same frequency across multiple stations give additional confirmation that coherence is
+  driven by a real signal, not an artefact in a single station.
+</p>
+
+<h3>⊞ Correlation Matrix</h3>
+<p>
+  Mean γ² between every pair of active stations, computed over the full time series.
+  Off-diagonal cells also show the <strong>great-circle distance in km</strong> between the two
+  stations. Coherence typically decreases with station separation, so this matrix lets you assess
+  spatial coherence scale lengths — a key observable for field-line resonance studies.
+  Click any cell to open the per-pair coherence spectrum detail.
+</p>
+
+<h3>🌍 Station Globe</h3>
+<p>
+  Orthographic globe view showing station positions as coloured dots and the top-6 station pairs
+  as arcs coloured by coherence (inferno scale). The globe auto-centres on the station network
+  centroid. <strong>Drag to rotate</strong> to inspect the network from any angle; click
+  <em>⟲ Reset view</em> to return to the centroid. Stations on the far hemisphere are hidden
+  (correct orthographic clipping).
+</p>
+
+<!-- ══════════════════════════════════ ULF BANDS ══════════════════════════════════ -->
+<h2>ULF Wave Bands</h2>
+<table class="band-table">
+  <tr><th>Band</th><th>Period</th><th>Frequency</th><th>Typical drivers</th></tr>
+  <tr>
+    <td>Pc5</td>
+    <td>150–600 s</td>
+    <td>1.7–6.7 mHz</td>
+    <td>Solar-wind pressure fluctuations, Kelvin–Helmholtz instability on the magnetopause, drift-bounce resonance with radiation-belt electrons</td>
+  </tr>
+  <tr>
+    <td>Pc4</td>
+    <td>45–150 s</td>
+    <td>6.7–22 mHz</td>
+    <td>Field-line resonances, bounce resonance with ring-current ions, magnetospheric cavity modes</td>
+  </tr>
+  <tr>
+    <td>Pc3</td>
+    <td>10–45 s</td>
+    <td>22–100 mHz</td>
+    <td>Upstream foreshock waves transmitted through the bow shock; highly coherent at low latitudes</td>
+  </tr>
+</table>
+<div class="tip">
+  <strong>Note:</strong> 1-minute cadence data (Nyquist 8.3 mHz) can only resolve Pc5 and the
+  very bottom of Pc4. Switch to 1-second cadence (SuperMAG) to study Pc3 and Pc4.
+</div>
+
+<!-- ══════════════════════════════════ PIPELINE ══════════════════════════════════ -->
+<h2>Signal-Processing Pipeline</h2>
+<p>All DSP is implemented from scratch in plain JavaScript (no library). The pipeline runs entirely in your browser.</p>
+
+<div class="pipeline-step">
+  <div class="step-num">1</div>
+  <div class="step-body">
+    <strong>Fetch per-station signals</strong>
+    The chosen source is queried for each active station independently. The true sampling rate
+    <code>fs</code> is derived from the median inter-sample interval, not assumed. Stations that
+    return no data are dropped and the remaining signals are trimmed to a common length.
+  </div>
+</div>
+<div class="pipeline-step">
+  <div class="step-num">2</div>
+  <div class="step-body">
+    <strong>First-difference</strong>
+    Each signal is first-differenced (<code>x[n] − x[n−1]</code>) to high-pass filter the data and
+    emphasise pulsation-band variability relative to slow baseline drift.
+  </div>
+</div>
+<div class="pipeline-step">
+  <div class="step-num">3</div>
+  <div class="step-body">
+    <strong>Sliding-window Welch coherence</strong>
+    A window of <em>Slice</em> samples slides across the time series in steps of <em>Step</em> samples.
+    For each window, every station's Welch FFT segments are computed once and cached, then every station
+    pair's magnitude-squared coherence is computed from the cached segments:
+    <code>γ²[k] = |P<sub>xy</sub>[k]|² / (P<sub>xx</sub>[k] · P<sub>yy</sub>[k])</code>.
+    The network average across all pairs gives one column of the coherogram.
+  </div>
+</div>
+<div class="pipeline-step">
+  <div class="step-num">4</div>
+  <div class="step-body">
+    <strong>Significance threshold</strong>
+    The analytic p&lt;0.05 threshold <code>γ²<sub>crit</sub> = 1 − 0.05<sup>1/(K−1)</sup></code>
+    is derived from the number of Welch sub-segments <em>K</em>. Higher K → lower threshold → more
+    sensitive detection, but the frequency resolution coarsens (each sub-segment is shorter).
+  </div>
+</div>
+<div class="pipeline-step">
+  <div class="step-num">5</div>
+  <div class="step-body">
+    <strong>Event detection</strong>
+    Contiguous time windows whose band-mean coherence exceeds an adaptive threshold (the maximum of
+    the significance threshold, mean+1.5σ, and 0.35) are flagged as events and classified into
+    Pc3/Pc4/Pc5 by their peak frequency.
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ TIPS ══════════════════════════════════ -->
+<h2>Tips &amp; Limitations</h2>
+
+<h3>Getting meaningful coherence</h3>
+<ul>
+  <li>Use at least 3–4 stations. With only 2 stations, a single noisy pair dominates the network average.</li>
+  <li>Mix high-latitude and mid-latitude stations to sample both Pc5 resonance nodes and Pc3 activity simultaneously.</li>
+  <li>A Slice of 20–30 minutes (1-min cadence) balances frequency resolution (~1–2 mHz bins) against temporal detail.</li>
+  <li>If coherence is suspiciously high everywhere (&gt;0.9), check that you are not using the SWPC source — it produces modelled, correlated signals.</li>
+</ul>
+
+<h3>Interpreting the colourmap</h3>
+<ul>
+  <li>The significance mask (p&lt;0.05) is a useful noise filter but conservative — real pulsations near threshold can be masked. Turn it off to see the full picture.</li>
+  <li>Isolated bright pixels are usually noise. Real ULF events appear as coherent bright patches spanning multiple time and frequency bins.</li>
+  <li>The Pc5|Pc4 and Pc4|Pc3 dashed gridlines on the coherogram help identify which band an event falls in.</li>
+</ul>
+
+<h3>Data gaps &amp; quality</h3>
+<ul>
+  <li>SuperMAG 1-second data is not available for all stations — many observatories only archive 1-minute data.</li>
+  <li>Large data gaps cause spectral leakage. The first-difference step reduces but does not eliminate this effect.</li>
+  <li>USGS data can have occasional NaN / fill-value samples, which are handled by the parser but may shorten the usable record.</li>
+</ul>
+
+<h3>Export</h3>
+<ul>
+  <li><strong>PNG</strong> exports the current coherogram canvas as an image.</li>
+  <li><strong>CSV</strong> exports the full coherogram data matrix (rows = frequency bins, columns = time windows) for offline analysis.</li>
+</ul>
+
+<h3>Auto-refresh</h3>
+<p>
+  The <strong>⟳ Auto-refresh</strong> button re-runs the analysis every 60 seconds, keeping the
+  coherogram current for near-real-time monitoring with USGS data (which updates with a ~1-day lag).
+  The countdown is shown in the status bar.
+</p>
+
+<!-- ══════════════════════════════════ TECH ══════════════════════════════════ -->
+<h2>Technical Notes</h2>
+<ul>
+  <li>Zero build step — pure HTML + JavaScript, runs directly from the filesystem or a static server.</li>
+  <li>The only external dependency is <strong>Chart.js 4.4.1</strong> (CDN), used only for the Time Series, FFT, and window-detail line charts.</li>
+  <li>The FFT is an in-place iterative Cooley–Tukey radix-2 algorithm. All FFT lengths are padded to the next power of two.</li>
+  <li>CORS: USGS and SuperMAG APIs do not allow direct browser requests. The bundled <code>proxy.py</code> serves static files on port 8080 and forwards API requests server-side. Run it with <code>python3 proxy.py</code>.</li>
+  <li>Settings (stations, source, date, parameters) are persisted to both <code>localStorage</code> and the URL hash so configurations are bookmarkable and shareable.</li>
+</ul>
+
+</div>
+</body>
+</html>

@@ -183,15 +183,18 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI
   <div class="tg">
     <label>Source</label>
     <select id="srcSelect">
-      <option value="usgs">USGS Geomagnetism (US, no account)</option>
-      <option value="supermag">SuperMAG ground network (global)</option>
-      <option value="swpc7d">SWPC Solar Wind 7-day</option>
-      <option value="swpc1d">DSCOVR Solar Wind 1-day</option>
-      <option value="goes">GOES-16 Magnetometer</option>
-      <option value="synthetic">Synthetic substorm</option>
+      <optgroup label="Real independent data">
+        <option value="usgs">USGS — historical, US stations, 1-min</option>
+        <option value="supermag">SuperMAG — historical, global network</option>
+      </optgroup>
+      <optgroup label="Single-source proxy (modeled coherence)">
+        <option value="swpc7d">NOAA SWPC — live solar wind, 7-day</option>
+        <option value="swpc1d">NOAA SWPC — live solar wind, 1-day</option>
+        <option value="synthetic">Synthetic — Pc3/4/5 test tones</option>
+      </optgroup>
     </select>
   </div>
-  <div class="tg">
+  <div class="tg" id="dateGroup">
     <label>Date / Time</label>
     <input type="datetime-local" id="datePick">
   </div>
@@ -243,6 +246,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI
 <div class="station-bar">
   <span class="sbar-label">Stations:</span>
   <div id="stationPills" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+  <span id="modeledWarning" style="display:none;font-size:11px;color:var(--warn);font-weight:600;padding:2px 8px;border:1px solid var(--warn);border-radius:4px;white-space:nowrap" title="All station signals are derived from one base measurement. Coherence reflects the model structure, not independent geophysical observations.">⚠ Modeled — coherence is synthetic</span>
   <div style="display:flex;gap:4px;align-items:center;margin-left:4px">
     <input type="text" id="addStationInput" placeholder="Add IAGA…" maxlength="20"
            style="width:96px;font-size:11px;padding:2px 6px"
@@ -477,7 +481,6 @@ function generateSynthetic(n, fs, s) {
 const URLS = {
   swpc7d:'https://services.swpc.noaa.gov/products/solar-wind/mag-7-day.json',
   swpc1d:'https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json',
-  goes:  'https://services.swpc.noaa.gov/json/goes/primary/magnetics-1-day.json',
 };
 // SuperMAG aggregates 300+ ground magnetometers worldwide into one format.
 // Requires a free logon ID and proxy.py to run (CORS blocked from static pages).
@@ -1530,6 +1533,10 @@ function buildStationPills(){
 // For 'usgs': foreign stations are dimmed/disabled and removed from activeStations.
 // For all other sources: all stations are available.
 function syncPillsToSource(src){
+  const isReal=src==='usgs'||src==='supermag';       // independent per-station data
+  const isLive=src==='swpc7d'||src==='swpc1d';       // live feeds; auto-refresh makes sense
+  const isSuper=src==='supermag';
+
   const avail=src==='usgs'
     ? new Set(STATIONS.filter(s=>s.usgsAvail).map(s=>s.id))
     : new Set(STATIONS.map(s=>s.id));
@@ -1548,11 +1555,29 @@ function syncPillsToSource(src){
     else pill.className='station-pill'+(isOn?' active':'');
     pill.style.cssText=isAvail?(isOn?styleOn:styleOff):'';
   });
-  // Cadence selector only meaningful for SuperMAG
-  const cg=document.getElementById('cadenceGroup');
-  if(cg) cg.style.display=src==='supermag'?'':'none';
-  const db=document.getElementById('discoverStationsBtn');
-  if(db) db.style.display=src==='supermag'?'':'none';
+
+  // ── Per-source parameter visibility ──
+  const show=id=>{const el=document.getElementById(id);if(el)el.style.display='';};
+  const hide=id=>{const el=document.getElementById(id);if(el)el.style.display='none';};
+
+  // Cadence & SuperMAG ID & Discover: SuperMAG only
+  isSuper ? show('cadenceGroup') : hide('cadenceGroup');
+  isSuper ? show('supermagGroup') : hide('supermagGroup');
+  isSuper ? show('discoverStationsBtn') : hide('discoverStationsBtn');
+
+  // Date/Time: historical sources only (USGS, SuperMAG)
+  isReal ? show('dateGroup') : hide('dateGroup');
+
+  // Component: only meaningful for sources with real independent components
+  isReal ? show('componentGroup') : hide('componentGroup');
+
+  // Auto-refresh: only useful for live feeds (SWPC); stop any running refresh otherwise
+  isLive ? show('autoRefreshBtn') : hide('autoRefreshBtn');
+  if(!isLive && autoRefreshActive) toggleAutoRefresh();
+
+  // Modeled-signal warning
+  isReal ? hide('modeledWarning') : show('modeledWarning');
+
   syncDatePickerToSource(src);
   saveSettings();
 }
@@ -1963,16 +1988,20 @@ function stationPickerSelectAll(val){
 }
 
 function applyStationPicker(){
-  const checked=[...document.querySelectorAll('#stationPickerList .stn-pick-chk:checked')].map(c=>c.value);
-  if(checked.length<2){setStatus('warn','Select at least 2 stations');return;}
-  // Add newly discovered stations into STATIONS if not already there
-  for(const iaga of checked){
+  const checkedSet=new Set([...document.querySelectorAll('#stationPickerList .stn-pick-chk:checked')].map(c=>c.value));
+  if(checkedSet.size<2){setStatus('warn','Select at least 2 stations');return;}
+  // Remove previously picker-added stations that aren't in the new selection
+  for(let i=STATIONS.length-1;i>=0;i--){
+    if(STATIONS[i]._fromPicker&&!checkedSet.has(STATIONS[i].id)) STATIONS.splice(i,1);
+  }
+  // Add newly selected stations not already in STATIONS
+  for(const iaga of checkedSet){
     if(!STATIONS.some(s=>s.id===iaga)){
       const p=_pickerStations.find(s=>s.id===iaga)||{id:iaga,name:null,lat:null,lon:null,color:_nextColor(),phaseOffset:0,ampScale:1,usgsAvail:false};
-      STATIONS.push({...p, phaseOffset:p.phaseOffset||0, ampScale:p.ampScale||1});
+      STATIONS.push({...p,_fromPicker:true,phaseOffset:p.phaseOffset||0,ampScale:p.ampScale||1});
     }
   }
-  activeStations=new Set(checked);
+  activeStations=new Set(checkedSet);
   buildStationPills();
   syncPillsToSource(document.getElementById('srcSelect').value);
   saveSettings();

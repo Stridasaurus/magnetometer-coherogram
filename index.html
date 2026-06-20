@@ -48,10 +48,20 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI
 /* ── Station bar ── */
 .station-bar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 5px 18px; display: flex; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
 .sbar-label { color: var(--text-dim); font-size: 11px; margin-right: 2px; }
-.station-pill { padding: 2px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface2); color: var(--text-dim); font-size: 11px; font-weight: 600; cursor: pointer; letter-spacing: 0.03em; transition: all 0.15s; user-select: none; }
-.station-pill.active { color: #fff; }
-.station-pill:hover:not(.active):not(.unavail) { border-color: var(--accent); }
-.station-pill.unavail { opacity: 0.25; cursor: not-allowed; pointer-events: none; }
+/* ── Station dropdown ── */
+.station-select-wrap { position:relative; }
+.station-drop-panel { position:absolute; top:calc(100% + 4px); left:0; z-index:50; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 12px; min-width:260px; max-width:400px; box-shadow:0 8px 24px rgba(0,0,0,0.55); }
+.stn-item { display:flex; align-items:center; gap:6px; padding:4px 6px; border-radius:4px; cursor:default; font-size:12px; }
+.stn-item:hover { background:var(--surface2); }
+.stn-item.stn-unavail { opacity:0.3; pointer-events:none; }
+.stn-item.stn-nodata { opacity:0.35; text-decoration:line-through; }
+.stn-id { font-weight:700; color:var(--text); min-width:38px; }
+.stn-name { color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+.stn-rm { margin-left:auto; opacity:0; font-size:10px; cursor:pointer; padding:0 3px; color:var(--danger); flex-shrink:0; }
+.stn-item:hover .stn-rm { opacity:0.6; }
+.stn-rm:hover { opacity:1 !important; }
+.stn-warn-icon { color:var(--warn); font-size:10px; flex-shrink:0; }
+.stn-input { background:var(--surface2); border:1px solid var(--border); color:var(--text); border-radius:4px; outline:none; font-size:11px; padding:3px 7px; }
 
 /* ── Metrics ── */
 .metrics-bar { display: flex; gap: 10px; padding: 8px 18px; flex-shrink: 0; flex-wrap: wrap; }
@@ -144,12 +154,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-/* ── Gap warning pill ── */
-.pill-warn { box-shadow: 0 0 0 2px var(--warn) !important; }
-.pill-remove { margin-left:4px; opacity:0.5; font-size:10px; cursor:pointer; }
-.pill-remove:hover { opacity:1; }
 .toolbar input[type=datetime-local] { width:160px; }
-.pill-nodata { opacity:0.3; text-decoration:line-through; }
 
 /* ── Coherogram mode buttons ── */
 .coh-mode-btns { display:flex; gap:3px; }
@@ -244,17 +249,32 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI
 
 <!-- ══ STATION BAR ══ -->
 <div class="station-bar">
-  <span class="sbar-label">Stations:</span>
-  <div id="stationPills" style="display:flex;gap:5px;flex-wrap:wrap"></div>
-  <span id="modeledWarning" style="display:none;font-size:11px;color:var(--warn);font-weight:600;padding:2px 8px;border:1px solid var(--warn);border-radius:4px;white-space:nowrap" title="All station signals are derived from one base measurement. Coherence reflects the model structure, not independent geophysical observations.">⚠ Modeled — coherence is synthetic</span>
-  <div style="display:flex;gap:4px;align-items:center;margin-left:4px">
-    <input type="text" id="addStationInput" placeholder="Add IAGA…" maxlength="20"
-           style="width:96px;font-size:11px;padding:2px 6px"
-           onkeydown="if(event.key==='Enter')addCustomStation()"
-           title="Enter IAGA code, or 'CODE lat lon Name' for globe placement">
-    <button class="btn btn-secondary" onclick="addCustomStation()" style="padding:2px 8px;font-size:11px">+</button>
-    <button id="discoverStationsBtn" class="btn btn-secondary" onclick="openStationPicker()" style="display:none;font-size:11px;padding:2px 10px" title="Query SuperMAG for all stations with data at the chosen date">🛰 Discover stations</button>
+  <span class="sbar-label">Stations</span>
+  <div class="station-select-wrap" id="stationSelectWrap">
+    <button class="btn btn-secondary" id="stationDropBtn" onclick="toggleStationDrop()" style="font-size:12px">
+      <span id="stationDropLabel">—</span>&thinsp;▾
+    </button>
+    <div class="station-drop-panel" id="stationDropPanel" style="display:none">
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+        <input type="text" id="stnFilter" class="stn-input" placeholder="Filter by IAGA or name…" oninput="filterStationDrop()" style="flex:1">
+        <span id="stnCount" style="font-size:11px;color:var(--text-dim);white-space:nowrap"></span>
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:8px">
+        <button class="btn btn-secondary" style="font-size:10px;padding:2px 8px" onclick="selectAllStations(true)">All</button>
+        <button class="btn btn-secondary" style="font-size:10px;padding:2px 8px" onclick="selectAllStations(false)">None</button>
+        <button id="discoverBtn" class="btn btn-secondary" style="font-size:10px;padding:2px 8px;display:none" onclick="discoverStations()">🛰 Discover</button>
+      </div>
+      <div id="stnList" style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:1px"></div>
+      <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;display:flex;gap:4px;align-items:center">
+        <input type="text" id="addStationInput" class="stn-input" placeholder="Add IAGA code…" maxlength="20"
+               style="flex:1"
+               onkeydown="if(event.key==='Enter')addCustomStation()"
+               title="IAGA code, or 'CODE lat lon Name' for globe placement">
+        <button class="btn btn-secondary" onclick="addCustomStation()" style="font-size:10px;padding:2px 8px">+</button>
+      </div>
+    </div>
   </div>
+  <span id="modeledWarning" style="display:none;font-size:11px;color:var(--warn);font-weight:600;padding:2px 8px;border:1px solid var(--warn);border-radius:4px;white-space:nowrap" title="All station signals are derived from one base measurement. Coherence reflects the model structure, not independent geophysical observations.">⚠ Modeled — coherence is synthetic</span>
 </div>
 
 <!-- ══ METRICS ══ -->
@@ -394,30 +414,6 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI
   </div>
 </div>
 
-<!-- ══ STATION PICKER MODAL ══ -->
-<div class="pair-modal-bg" id="stationPickerModal" onclick="if(event.target===this)document.getElementById('stationPickerModal').classList.remove('open')">
-  <div class="pair-modal" style="width:min(640px,94vw);max-height:85vh;display:flex;flex-direction:column">
-    <div class="pair-modal-header">
-      <div class="pair-modal-title">🛰 Active SuperMAG Stations</div>
-      <button class="pair-modal-close" onclick="document.getElementById('stationPickerModal').classList.remove('open')">✕</button>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-      <input type="text" id="stationSearch" placeholder="Filter by IAGA code or name…"
-             oninput="filterStationPicker()"
-             style="flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:5px;font-size:12px;outline:none">
-      <span id="stationPickCount" style="font-size:11px;color:var(--text-dim);white-space:nowrap;min-width:80px;text-align:right"></span>
-    </div>
-    <div style="display:flex;gap:6px;margin-bottom:10px">
-      <button class="btn btn-secondary" style="font-size:11px;padding:2px 10px" onclick="stationPickerSelectAll(true)">Select all</button>
-      <button class="btn btn-secondary" style="font-size:11px;padding:2px 10px" onclick="stationPickerSelectAll(false)">Clear all</button>
-    </div>
-    <div id="stationPickerList" style="flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:4px;padding-right:4px"></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
-      <button class="btn btn-secondary" onclick="document.getElementById('stationPickerModal').classList.remove('open')">Cancel</button>
-      <button class="btn btn-primary" onclick="applyStationPicker()">▶ Use selected</button>
-    </div>
-  </div>
-</div>
 
 <script src="dsp.js"></script>
 <script>
@@ -449,7 +445,8 @@ const STATIONS = [
   { id:'HER', name:'Hermanus, S. Africa',lat:-34.43,lon:19.23,   phaseOffset:0.07, ampScale:0.90, color:'#f98cd0', usgsAvail:false },
 ];
 let activeStations = new Set(STATIONS.map(s => s.id));
-const pillEls = {}; // id → DOM element, for source-aware pill updates
+let nodataStations = new Set(); // station IDs that returned no data in last analysis
+let warnStationIds = new Set(); // station IDs with < 85% data coverage
 
 // DSP primitives (infernoRGB, fft, nextPow2, welchCoherence, welchSegments,
 // coherenceFromSegments, firstDifference, computeSigThreshold, mulberry32,
@@ -670,8 +667,8 @@ async function runAnalysis() {
   const sliceLen=Math.max(is1min?5:60, Math.min(is1min?360:3600, parseInt(document.getElementById('sliceLen').value)||(is1min?30:600)));
   const stepSize=Math.max(is1min?1:10,  Math.min(is1min?60:600,  parseInt(document.getElementById('stepSize').value)||(is1min?6:60)));
 
-  // Clear pill-nodata marks from previous run
-  for(const [,pill] of Object.entries(pillEls)) pill.classList.remove('pill-nodata');
+  // Clear station marks from previous run
+  nodataStations.clear(); warnStationIds.clear();
   setMetric('mWindow','—');
 
   // Clear old spinners
@@ -718,15 +715,10 @@ async function runAnalysis() {
       }
     }
     const useSynth=Object.keys(stationSigs).length<2;
-    // Mark pills for requested stations that returned no real data
+    // Mark stations that returned no real data
     if(!useSynth){
       const returnedIds=new Set(Object.keys(stationSigs));
-      for(const s of requested){
-        if(!returnedIds.has(s.id)&&pillEls[s.id]){
-          pillEls[s.id].classList.add('pill-nodata');
-          pillEls[s.id].title=`${s.id}: no data at this date`;
-        }
-      }
+      for(const s of requested) if(!returnedIds.has(s.id)) nodataStations.add(s.id);
     }
     if(useSynth){
       spin('Generating synthetic station signals…'); await tick();
@@ -753,17 +745,8 @@ async function runAnalysis() {
         if(ef<0.85) warnStations.add(s.id);
       }
     }
-    // Update pill warning badges
-    for(const [, pill] of Object.entries(pillEls)){
-      pill.classList.remove('pill-warn');
-      pill.querySelector('.warn-icon')?.remove();
-    }
-    for(const id of warnStations){
-      const pill=pillEls[id]; if(!pill) continue;
-      pill.classList.add('pill-warn');
-      const wi=document.createElement('span'); wi.className='warn-icon';
-      wi.textContent=' ⚠'; wi.title='< 85% data coverage'; pill.appendChild(wi);
-    }
+    // Store warn station IDs for dropdown rendering
+    for(const id of warnStations) warnStationIds.add(id);
 
     // Frequencies above Nyquist (fs/2) are unresolvable — clamp the band there
     // so the UI never implies it can see e.g. Pc3 in 1-minute data.
@@ -891,6 +874,11 @@ async function runAnalysis() {
     if(currentTab===3) renderMatrix(lastResult);
     if(currentTab===4) startGlobe(lastResult);
     drawColorbar(sigThreshold);
+
+    // Refresh station dropdown nodata/warn marks
+    {const dp=document.getElementById('stationDropPanel');
+     if(dp&&dp.style.display!=='none') buildStationDrop();
+     else updateStationDropLabel();}
 
     const warnCount=warnStations.size;
     const warnNote=warnCount?` · ${warnCount} ⚠`:'';
@@ -1506,76 +1494,110 @@ function setMetric(id,val,digits=0){
   const el=document.getElementById(id);
   if(el) el.textContent=(val===null||val===undefined)?'—':(typeof val==='number'?val.toFixed(digits):val);
 }
-function buildStationPills(){
-  const c=document.getElementById('stationPills');
+// ═══════════════════════════════════════════════════════════
+//  STATION DROPDOWN
+// ═══════════════════════════════════════════════════════════
+function buildStationDrop(){
+  const list=document.getElementById('stnList'); if(!list) return;
+  const src=document.getElementById('srcSelect').value;
+  const avail=src==='usgs'
+    ? new Set(STATIONS.filter(s=>s.usgsAvail).map(s=>s.id))
+    : new Set(STATIONS.map(s=>s.id));
+  list.innerHTML='';
   STATIONS.forEach(s=>{
-    const pill=document.createElement('div');
-    const on=activeStations.has(s.id);
-    const styleOn=`border-color:${s.color};background:${s.color}33;color:${s.color}`;
-    const styleOff=`border-color:${s.color};color:${s.color}88;background:transparent`;
-    pill.className='station-pill'+(on?' active':'');
-    pill.textContent=`${s.id} · ${s.name}`;
-    pill.style.cssText=on?styleOn:styleOff;
-    pill.addEventListener('click',()=>{
-      if(pill.classList.contains('unavail')) return;
-      const active=activeStations.has(s.id);
-      if(active&&activeStations.size<=2){setStatus('warn','Minimum 2 stations required');return;}
-      if(active){activeStations.delete(s.id);pill.className='station-pill';pill.style.cssText=styleOff;}
-      else{activeStations.add(s.id);pill.className='station-pill active';pill.style.cssText=styleOn;}
-      saveSettings();
-    });
-    c.appendChild(pill);
-    pillEls[s.id]=pill;
+    const isAvail=avail.has(s.id);
+    const isOn=activeStations.has(s.id);
+    const hasNoData=nodataStations.has(s.id);
+    const hasWarn=warnStationIds.has(s.id);
+    const label=document.createElement('label');
+    label.className='stn-item'+(isAvail?'':' stn-unavail')+(hasNoData?' stn-nodata':'');
+    label.dataset.iaga=s.id;
+    label.dataset.name=(s.name||'').toLowerCase();
+    const dot=`<span style="width:7px;height:7px;border-radius:50%;background:${s.color};flex-shrink:0;display:inline-block"></span>`;
+    const warn=hasWarn?`<span class="stn-warn-icon" title="< 85% data coverage">⚠</span>`:'';
+    const rm=s.custom?`<span class="stn-rm" title="Remove ${s.id}" onclick="event.preventDefault();event.stopPropagation();removeCustomStation('${s.id}')">✕</span>`:'';
+    label.innerHTML=`<input type="checkbox" value="${s.id}"${isOn?' checked':''}${isAvail?'':' disabled'}>${dot}<span class="stn-id">${s.id}</span><span class="stn-name">${s.name||''}</span>${warn}${rm}`;
+    label.querySelector('input').addEventListener('change',e=>onStnCheck(s.id,e.target));
+    list.appendChild(label);
+  });
+  updateStationDropLabel();
+}
+
+function updateStationDropLabel(){
+  const lbl=document.getElementById('stationDropLabel'); if(!lbl) return;
+  const ids=[...activeStations];
+  const shown=ids.slice(0,3).join(', ');
+  const more=ids.length>3?` +${ids.length-3}`:'';
+  lbl.textContent=ids.length===0?'none':shown+more;
+  const cnt=document.getElementById('stnCount');
+  if(cnt) cnt.textContent=`${ids.length} / ${STATIONS.length}`;
+}
+
+function toggleStationDrop(){
+  const panel=document.getElementById('stationDropPanel'); if(!panel) return;
+  if(panel.style.display!=='none'){panel.style.display='none';return;}
+  buildStationDrop();
+  panel.style.display='';
+  const f=document.getElementById('stnFilter'); if(f){f.value='';f.focus();}
+}
+
+function filterStationDrop(){
+  const q=(document.getElementById('stnFilter')?.value||'').trim().toLowerCase();
+  document.querySelectorAll('#stnList .stn-item').forEach(el=>{
+    el.style.display=(!q||el.dataset.iaga.toLowerCase().includes(q)||(el.dataset.name||'').includes(q))?'':'none';
   });
 }
 
-// Show only the stations a given source can actually serve.
-// For 'usgs': foreign stations are dimmed/disabled and removed from activeStations.
-// For all other sources: all stations are available.
-function syncPillsToSource(src){
-  const isReal=src==='usgs'||src==='supermag';       // independent per-station data
-  const isLive=src==='swpc7d'||src==='swpc1d';       // live feeds; auto-refresh makes sense
+function onStnCheck(id,cb){
+  if(!cb.checked&&activeStations.size<=2){
+    setStatus('warn','Minimum 2 stations required');
+    cb.checked=true; return;
+  }
+  if(cb.checked) activeStations.add(id); else activeStations.delete(id);
+  updateStationDropLabel();
+  saveSettings();
+}
+
+function selectAllStations(val){
+  const src=document.getElementById('srcSelect').value;
+  const avail=src==='usgs'
+    ? new Set(STATIONS.filter(s=>s.usgsAvail).map(s=>s.id))
+    : new Set(STATIONS.map(s=>s.id));
+  if(val){ avail.forEach(id=>activeStations.add(id)); }
+  else { const ids=[...activeStations]; for(const id of ids) if(activeStations.size>2) activeStations.delete(id); }
+  buildStationDrop();
+  saveSettings();
+}
+
+// Syncs STATIONS availability + dropdown with the current source.
+// For 'usgs': foreign stations are excluded from the active set.
+// Also controls per-source toolbar parameter visibility.
+function syncStationsToSource(src){
+  const isReal=src==='usgs'||src==='supermag';
+  const isLive=src==='swpc7d'||src==='swpc1d';
   const isSuper=src==='supermag';
 
   const avail=src==='usgs'
     ? new Set(STATIONS.filter(s=>s.usgsAvail).map(s=>s.id))
     : new Set(STATIONS.map(s=>s.id));
-  // Remove unavailable stations from active set, preserve min-2
   for(const id of [...activeStations]) if(!avail.has(id)) activeStations.delete(id);
-  if(activeStations.size<2){
+  if(activeStations.size<2)
     STATIONS.filter(s=>avail.has(s.id)).slice(0,2).forEach(s=>activeStations.add(s.id));
-  }
-  // Update every pill's appearance
-  STATIONS.forEach(s=>{
-    const pill=pillEls[s.id]; if(!pill) return;
-    const isAvail=avail.has(s.id), isOn=activeStations.has(s.id);
-    const styleOn=`border-color:${s.color};background:${s.color}33;color:${s.color}`;
-    const styleOff=`border-color:${s.color};color:${s.color}88;background:transparent`;
-    if(!isAvail) pill.className='station-pill unavail';
-    else pill.className='station-pill'+(isOn?' active':'');
-    pill.style.cssText=isAvail?(isOn?styleOn:styleOff):'';
-  });
+
+  const panel=document.getElementById('stationDropPanel');
+  if(panel&&panel.style.display!=='none') buildStationDrop();
+  else updateStationDropLabel();
 
   // ── Per-source parameter visibility ──
   const show=id=>{const el=document.getElementById(id);if(el)el.style.display='';};
   const hide=id=>{const el=document.getElementById(id);if(el)el.style.display='none';};
-
-  // Cadence & SuperMAG ID & Discover: SuperMAG only
   isSuper ? show('cadenceGroup') : hide('cadenceGroup');
   isSuper ? show('supermagGroup') : hide('supermagGroup');
-  isSuper ? show('discoverStationsBtn') : hide('discoverStationsBtn');
-
-  // Date/Time: historical sources only (USGS, SuperMAG)
+  isSuper ? show('discoverBtn') : hide('discoverBtn');
   isReal ? show('dateGroup') : hide('dateGroup');
-
-  // Component: only meaningful for sources with real independent components
   isReal ? show('componentGroup') : hide('componentGroup');
-
-  // Auto-refresh: only useful for live feeds (SWPC); stop any running refresh otherwise
   isLive ? show('autoRefreshBtn') : hide('autoRefreshBtn');
   if(!isLive && autoRefreshActive) toggleAutoRefresh();
-
-  // Modeled-signal warning
   isReal ? hide('modeledWarning') : show('modeledWarning');
 
   syncDatePickerToSource(src);
@@ -1804,7 +1826,7 @@ function addCustomStation(){
     color:EXTRA_COLORS[customStationList.length%EXTRA_COLORS.length]};
   addCustomStationEntry(cs);
   activeStations.add(id);
-  syncPillsToSource(document.getElementById('srcSelect').value);
+  syncStationsToSource(document.getElementById('srcSelect').value);
   inp.value='';
   setStatus('ok',`Added station ${id}${!cs.lat?' (no coords — globe will skip it)':''}`);
   saveSettings();
@@ -1817,39 +1839,15 @@ function addCustomStationEntry(cs){
     phaseOffset:0,ampScale:1,usgsAvail:false,custom:true};
   customStationList.push(st);
   STATIONS.push(st);
-  // Build pill
-  const pill=document.createElement('div');
-  const styleOn=`border-color:${st.color};background:${st.color}33;color:${st.color}`;
-  const styleOff=`border-color:${st.color};color:${st.color}88;background:transparent`;
-  const on=activeStations.has(st.id);
-  pill.className='station-pill'+(on?' active':'');
-  pill.style.cssText=on?styleOn:styleOff;
-  const nameSpan=document.createElement('span');
-  nameSpan.textContent=`${st.id} · ${st.name}`;
-  const rm=document.createElement('span');
-  rm.className='pill-remove'; rm.textContent=' ✕'; rm.title=`Remove ${st.id}`;
-  rm.addEventListener('click',e=>{e.stopPropagation();removeCustomStation(st.id,pill);});
-  pill.appendChild(nameSpan); pill.appendChild(rm);
-  pill.addEventListener('click',()=>{
-    if(pill.classList.contains('unavail')) return;
-    const active=activeStations.has(st.id);
-    if(active&&activeStations.size<=2){setStatus('warn','Minimum 2 stations required');return;}
-    if(active){activeStations.delete(st.id);pill.className='station-pill';pill.style.cssText=styleOff;}
-    else{activeStations.add(st.id);pill.className='station-pill active';pill.style.cssText=styleOn;}
-    saveSettings();
-  });
-  document.getElementById('stationPills').appendChild(pill);
-  pillEls[st.id]=pill;
 }
 
-function removeCustomStation(id,pill){
+function removeCustomStation(id){
   customStationList=customStationList.filter(s=>s.id!==id);
   const idx=STATIONS.findIndex(s=>s.id===id);
   if(idx>=0) STATIONS.splice(idx,1);
   activeStations.delete(id);
-  if(pill) pill.remove();
-  delete pillEls[id];
   if(activeStations.size<2) STATIONS.slice(0,2).forEach(s=>activeStations.add(s.id));
+  buildStationDrop();
   saveSettings();
   setStatus('ok',`Removed station ${id}`);
 }
@@ -1890,7 +1888,7 @@ function updateSliceRanges(){
 }
 
 // ═══════════════════════════════════════════════════════════
-//  SUPERMAG STATION PICKER
+//  SUPERMAG STATION DISCOVERY (inline dropdown)
 // ═══════════════════════════════════════════════════════════
 const _COLOR_CYCLE=['#4f9cf9','#f97b4f','#3ecf8e','#f9cf4f','#7fb0ff','#cf4ff9',
   '#f94fa8','#f95f5f','#6fe0a0','#5fd0f9','#9b8cff','#5fe0c0',
@@ -1902,28 +1900,22 @@ function _nextColor(){
   return _COLOR_CYCLE.find(c=>!used.has(c))||_COLOR_CYCLE[STATIONS.length%_COLOR_CYCLE.length];
 }
 
-let _pickerStations=[];  // [{id,name,lat,lon,color,known}] from last discovery
-
-async function openStationPicker(){
+async function discoverStations(){
   const userid=document.getElementById('supermagUser').value.trim();
   if(!userid){setStatus('warn','Enter your SuperMAG ID first');return;}
 
-  const modal=document.getElementById('stationPickerModal');
-  const list=document.getElementById('stationPickerList');
-  document.getElementById('stationSearch').value='';
-  list.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:30px 0;color:var(--text-dim)">Probing SuperMAG — please wait…</div>';
-  modal.classList.add('open');
+  const list=document.getElementById('stnList'); if(!list) return;
+  list.innerHTML='<div style="text-align:center;padding:16px;color:var(--text-dim)">Probing SuperMAG…</div>';
 
-  try {
+  try{
     const date=document.getElementById('datePick').value;
     const cadSec=parseInt(document.getElementById('cadenceSel').value)||60;
     const use1sec=cadSec===1;
     const dtStr=date||new Date(Date.now()-60*86400000).toISOString().slice(0,16);
     const start=dtStr.replace(/-/g,'').replace('T','').replace(':','').slice(0,12);
     const deltaParam=use1sec?'&delta=s':'';
-    const extent=use1sec?10:60;   // tiny extent — just enough to see which stations respond
+    const extent=use1sec?10:60;
     const url=`${SUPERMAG_API}?fmt=json&logon=${encodeURIComponent(userid)}&start=${start}&extent=${extent}&mag${deltaParam}`;
-    // No _stations filter → proxy returns all stations unfiltered
 
     const r=await fetch(url);
     const text=await r.text();
@@ -1932,80 +1924,30 @@ async function openStationPicker(){
     if(statusLine!=='OK') throw new Error(statusLine.slice(0,120));
     const recs=JSON.parse(nl>=0?text.slice(nl+1):'[]');
 
-    // Unique IAGA codes, sorted
-    const seen=new Set();
-    const iagaList=[];
+    const seen=new Set(); const iagaList=[];
     for(const rec of recs){if(rec.iaga&&!seen.has(rec.iaga)){seen.add(rec.iaga);iagaList.push(rec.iaga);}}
     iagaList.sort();
 
-    // Build station objects: use known metadata if available
-    _pickerStations=iagaList.map(iaga=>{
-      const k=STATIONS.find(s=>s.id===iaga);
-      return k ? {...k,known:true} : {id:iaga,name:null,lat:null,lon:null,color:_nextColor(),known:false,phaseOffset:0,ampScale:1,usgsAvail:false};
-    });
-
-    _renderPickerList(_pickerStations);
-  } catch(e){
-    list.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:30px 0;color:var(--danger)">Discovery failed: ${e.message}</div>`;
-  }
-}
-
-function _renderPickerList(stations){
-  const list=document.getElementById('stationPickerList');
-  list.innerHTML=stations.map(s=>`
-    <label style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:5px;
-                  border:1px solid var(--border);cursor:pointer;background:var(--surface2)" data-iaga="${s.id}" data-name="${(s.name||'').toLowerCase()}">
-      <input type="checkbox" class="stn-pick-chk" value="${s.id}" ${activeStations.has(s.id)?'checked':''} onchange="_updatePickerCount()">
-      <span style="width:8px;height:8px;border-radius:50%;background:${s.color};flex-shrink:0"></span>
-      <span style="font-weight:700;color:var(--text);font-size:12px">${s.id}</span>
-      ${s.name?`<span style="color:var(--text-dim);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.name}">${s.name}</span>`:''}
-    </label>
-  `).join('');
-  _updatePickerCount();
-}
-
-function filterStationPicker(){
-  const q=document.getElementById('stationSearch').value.trim().toLowerCase();
-  document.querySelectorAll('#stationPickerList label[data-iaga]').forEach(el=>{
-    const match=!q||el.dataset.iaga.toLowerCase().includes(q)||el.dataset.name.includes(q);
-    el.style.display=match?'':'none';
-  });
-  _updatePickerCount();
-}
-
-function _updatePickerCount(){
-  const total=document.querySelectorAll('#stationPickerList .stn-pick-chk').length;
-  const checked=document.querySelectorAll('#stationPickerList .stn-pick-chk:checked').length;
-  const el=document.getElementById('stationPickCount');
-  if(el) el.textContent=`${checked} / ${total} selected`;
-}
-
-function stationPickerSelectAll(val){
-  document.querySelectorAll('#stationPickerList label[data-iaga]').forEach(el=>{
-    if(el.style.display!=='none'){const cb=el.querySelector('.stn-pick-chk');if(cb)cb.checked=val;}
-  });
-  _updatePickerCount();
-}
-
-function applyStationPicker(){
-  const checkedSet=new Set([...document.querySelectorAll('#stationPickerList .stn-pick-chk:checked')].map(c=>c.value));
-  if(checkedSet.size<2){setStatus('warn','Select at least 2 stations');return;}
-  // Remove previously picker-added stations that aren't in the new selection
-  for(let i=STATIONS.length-1;i>=0;i--){
-    if(STATIONS[i]._fromPicker&&!checkedSet.has(STATIONS[i].id)) STATIONS.splice(i,1);
-  }
-  // Add newly selected stations not already in STATIONS
-  for(const iaga of checkedSet){
-    if(!STATIONS.some(s=>s.id===iaga)){
-      const p=_pickerStations.find(s=>s.id===iaga)||{id:iaga,name:null,lat:null,lon:null,color:_nextColor(),phaseOffset:0,ampScale:1,usgsAvail:false};
-      STATIONS.push({...p,_fromPicker:true,phaseOffset:p.phaseOffset||0,ampScale:p.ampScale||1});
+    // Remove previously discovered stations not in new results
+    for(let i=STATIONS.length-1;i>=0;i--){
+      if(STATIONS[i]._fromPicker&&!seen.has(STATIONS[i].id)) STATIONS.splice(i,1);
     }
+    // Add new stations not already in STATIONS
+    for(const iaga of iagaList){
+      if(!STATIONS.some(s=>s.id===iaga)){
+        const k=STATIONS.find(s=>s.id===iaga);
+        STATIONS.push(k?{...k,_fromPicker:true}:{id:iaga,name:null,lat:null,lon:null,
+          color:_nextColor(),phaseOffset:0,ampScale:1,usgsAvail:false,_fromPicker:true});
+      }
+    }
+    activeStations=new Set(iagaList);
+    setStatus('ok',`Discovered ${iagaList.length} stations`);
+    buildStationDrop();
+    saveSettings();
+  }catch(e){
+    list.innerHTML=`<div style="text-align:center;padding:16px;color:var(--danger)">Discovery failed: ${e.message}</div>`;
+    setStatus('err',`Discovery failed: ${e.message}`);
   }
-  activeStations=new Set(checkedSet);
-  buildStationPills();
-  syncPillsToSource(document.getElementById('srcSelect').value);
-  saveSettings();
-  document.getElementById('stationPickerModal').classList.remove('open');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2038,10 +1980,18 @@ window.addEventListener('resize',()=>{
 // ═══════════════════════════════════════════════════════════
 applySettings(loadSettings());            // URL hash > localStorage > defaults
 
-buildStationPills();                       // reflects restored activeStations
-syncPillsToSource(document.getElementById('srcSelect').value); // dim/enable by source
+updateStationDropLabel();                 // reflects restored activeStations
+syncStationsToSource(document.getElementById('srcSelect').value); // dim/enable by source
 document.getElementById('srcSelect').addEventListener('change',function(){
-  syncPillsToSource(this.value);
+  syncStationsToSource(this.value);
+});
+// Close dropdown when clicking outside the station selector
+document.addEventListener('click',e=>{
+  const wrap=document.getElementById('stationSelectWrap');
+  if(wrap&&!wrap.contains(e.target)){
+    const panel=document.getElementById('stationDropPanel');
+    if(panel) panel.style.display='none';
+  }
 });
 
 // Slice/step hints and range updates on cadence change

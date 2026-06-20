@@ -632,12 +632,13 @@ async function runAnalysis() {
   closeDetail();
 
   saveSettings();
-  const sliceLen=Math.max(120,Math.min(3600,parseInt(document.getElementById('sliceLen').value)||600));
-  const stepSize=Math.max(10, Math.min(600, parseInt(document.getElementById('stepSize').value)||60));
   const userMaxFreqHz=Math.max(0.005,Math.min(0.1,(parseFloat(document.getElementById('maxFreq').value)||50)/1000));
   const src=document.getElementById('srcSelect').value;
   const pickDate=document.getElementById('datePick').value||null;
   const cadenceReqSec=parseInt(document.getElementById('cadenceSel').value)||60;
+  const is1min=cadenceReqSec===60;
+  const sliceLen=Math.max(is1min?5:60, Math.min(is1min?360:3600, parseInt(document.getElementById('sliceLen').value)||(is1min?30:600)));
+  const stepSize=Math.max(is1min?1:10,  Math.min(is1min?60:600,  parseInt(document.getElementById('stepSize').value)||(is1min?6:60)));
 
   // Clear pill-nodata marks from previous run
   for(const [,pill] of Object.entries(pillEls)) pill.classList.remove('pill-nodata');
@@ -1803,17 +1804,31 @@ function removeCustomStation(id,pill){
 //  SLICE/STEP HINTS
 // ═══════════════════════════════════════════════════════════
 function updateSliceHints(){
-  const fmtSec=s=>{const v=parseInt(s);return v>=120?`(${Math.round(v/60)} min)`:v>=60?'(1 min)':'';};
+  const cadSec=parseInt(document.getElementById('cadenceSel').value)||60;
+  const fmt=s=>{
+    const v=parseInt(s); if(!v) return '';
+    const tot=v*cadSec;
+    return tot>=3600?`(${(tot/3600).toFixed(1)} h)`:tot>=60?`(${Math.round(tot/60)} min)`:`(${tot} s)`;
+  };
   const sh=document.getElementById('sliceHint'), sth=document.getElementById('stepHint');
-  if(sh) sh.textContent=fmtSec(document.getElementById('sliceLen').value);
-  if(sth) sth.textContent=fmtSec(document.getElementById('stepSize').value);
+  if(sh) sh.textContent=fmt(document.getElementById('sliceLen').value);
+  if(sth) sth.textContent=fmt(document.getElementById('stepSize').value);
 }
 
 function updateSliceRanges(){
-  const is1sec=document.getElementById('cadenceSel').value==='1';
+  const is1min=document.getElementById('cadenceSel').value==='60';
   const sl=document.getElementById('sliceLen'), st=document.getElementById('stepSize');
-  if(is1sec){sl.min=60;sl.max=3600;sl.step=30;st.min=10;st.max=600;st.step=10;}
-  else{sl.min=120;sl.max=21600;sl.step=60;st.min=60;st.max=3600;st.step=60;}
+  if(is1min){
+    sl.min=5; sl.max=360; sl.step=5;
+    st.min=1; st.max=60;  st.step=1;
+    if(parseInt(sl.value)>360||parseInt(sl.value)<5) sl.value=30;
+    if(parseInt(st.value)>60 ||parseInt(st.value)<1) st.value=6;
+  } else {
+    sl.min=60; sl.max=3600; sl.step=30;
+    st.min=10; st.max=600;  st.step=10;
+    if(parseInt(sl.value)>3600||parseInt(sl.value)<60) sl.value=600;
+    if(parseInt(st.value)>600 ||parseInt(st.value)<10) st.value=60;
+  }
   updateSliceHints();
 }
 

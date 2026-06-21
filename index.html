@@ -667,7 +667,8 @@ function onWorkerMessage(e){
   }
 }
 function cancelAnalysis(){
-  if(analysisWorker) analysisWorker.postMessage({type:'cancel'});
+  if(analysisWorker){ analysisWorker.terminate(); analysisWorker=null; }
+  _failAnalysis('Cancelled');
 }
 function _failAnalysis(msg){
   document.getElementById('runBtn').disabled=false;
@@ -721,6 +722,7 @@ function _finishAnalysis(workerResult){
   const stationNote=useSynth?'':`${activeList.length}/${requestedCount} stations${warnNote}`;
   const label=useSynth?'synthetic substorm':(src==='supermag'?`SuperMAG (${stationNote})`:src==='usgs'?`USGS (${stationNote})`:`NOAA SWPC (${src})`);
   setStatus('ok',`Complete — ${nTimes} slices · ${events.length} event${events.length!==1?'s':''} detected · ${label}`);
+  if(autoRefreshActive) scheduleRefresh();
 }
 
 function freshCanvas(id) {
@@ -1023,7 +1025,12 @@ function setupCoherogramInteraction() {
     tooltip.style.display='block';
     tooltip.style.left=Math.min(mx+12,rect.width-200)+'px';
     tooltip.style.top=Math.max(my-36,4)+'px';
-    tooltip.innerHTML=`<b>γ² = ${coh.toFixed(3)}</b> &nbsp; ${fmhz} mHz &nbsp; t=${tmin}m${utcNote}${phaseNote}`;
+    if(cohMode==='phase'&&lastResult.coherogramPhase&&lastResult.coherogramPhase[ti]){
+      const phi=lastResult.coherogramPhase[ti][fi];
+      tooltip.innerHTML=`<b>φ = ${(phi*180/Math.PI).toFixed(0)}°</b> &nbsp; ${fmhz} mHz &nbsp; t=${tmin}m${utcNote} &nbsp; γ²=${coh.toFixed(3)}`;
+    } else {
+      tooltip.innerHTML=`<b>γ² = ${coh.toFixed(3)}</b> &nbsp; ${fmhz} mHz &nbsp; t=${tmin}m${utcNote}${phaseNote}`;
+    }
   });
   wrap.addEventListener('mouseleave',()=>{tooltip.style.display='none';});
   wrap.addEventListener('click', e=>{
@@ -1041,22 +1048,26 @@ function setupCoherogramInteraction() {
 function openDetail(ti,fi) {
   const r=lastResult;
   if(!r) return;
-  const {windowStarts,sliceSamples,diffSigs,activeList,ulfFreqs,allFreqs,ulfMask,nperseg,fs,times,coherogramData,sigThreshold}=r;
-  const start=windowStarts[ti];
+  const {windowStarts,activeList,ulfFreqs,times,coherogramData,sigThreshold,pairCohMap,skipPairCoh}=r;
   const fmhz=(ulfFreqs[fi]*1000).toFixed(1);
   const tmin=(times[ti]/60).toFixed(1);
 
-  // Compute per-pair coherence for this window
+  // Read per-pair coherence from Worker cache (no main-thread recompute)
   const pairs=[];
+  if(skipPairCoh){
+    document.getElementById('detailTitle').textContent=
+      `Window t=${tmin}m · ${fmhz} mHz — per-pair detail unavailable for networks >100 pairs`;
+    document.getElementById('detailPanel').classList.add('open');
+    return;
+  }
   for(let i=0;i<activeList.length;i++) for(let j=i+1;j<activeList.length;j++){
     const sa=activeList[i], sb=activeList[j];
-    const xa=diffSigs[sa.id].slice(start,start+sliceSamples);
-    const xb=diffSigs[sb.id].slice(start,start+sliceSamples);
-    const res=welchCoherence(xa,xb,fs,nperseg);
-    if(res){
-      const cohAtFi=res.coherence[ulfMask[fi]]??0;
+    const pk=`${sa.id}:${sb.id}`;
+    const pRow=pairCohMap&&pairCohMap[pk]&&pairCohMap[pk][ti];
+    if(pRow){
+      const cohAtFi=pRow[fi];
       pairs.push({label:`${sa.id}–${sb.id}`,color:blendColor(sa.color,sb.color),
-        freqs:ulfFreqs, coherence:ulfMask.map(k=>res.coherence[k]), cohAtFi});
+        freqs:ulfFreqs, coherence:Array.from(pRow), cohAtFi});
     }
   }
   pairs.sort((a,b)=>b.cohAtFi-a.cohAtFi);
@@ -1219,7 +1230,7 @@ function renderMatrix(r){
   ctx.fillStyle='#8a9ac0'; ctx.font='10px monospace';
   ctx.textAlign='left'; ctx.fillText('0',PAD,cbY+20);
   ctx.textAlign='right'; ctx.fillText('1',W,cbY+20);
-  const footerNote=r.skipPairCoh?'mean γ² across ULF band  ·  per-pair coherogram available when ≤14 stations':'mean γ² across ULF band — click a cell to view pair coherogram';
+  const footerNote=r.skipPairCoh?'mean γ² across ULF band  ·  per-pair coherogram available when ≤100 pairs':'mean γ² across ULF band — click a cell to view pair coherogram';
   ctx.textAlign='center'; ctx.fillText(footerNote,(W+PAD)/2,cbY+20);
 
   // Click → per-pair coherogram modal
@@ -1465,7 +1476,7 @@ function scheduleRefresh(){
     document.getElementById('refreshCountdown').textContent=`Next refresh: ${autoRefreshSeconds}s`;
     if(autoRefreshSeconds<=0){
       document.getElementById('refreshCountdown').textContent='Refreshing…';
-      runAnalysis().then(scheduleRefresh);
+      runAnalysis(); // _finishAnalysis calls scheduleRefresh when done
     } else { autoRefreshInterval=setTimeout(tick,1000); }
   };
   autoRefreshInterval=setTimeout(tick,1000);
@@ -1598,6 +1609,7 @@ function syncStationsToSource(src){
   const show=id=>{const el=document.getElementById(id);if(el)el.style.display='';};
   const hide=id=>{const el=document.getElementById(id);if(el)el.style.display='none';};
   isSuper ? show('cadenceGroup') : hide('cadenceGroup');
+  if(!isSuper){ document.getElementById('cadenceSel').value='60'; updateSliceRanges(); }
   isSuper ? show('supermagGroup') : hide('supermagGroup');
   isSuper ? show('discoverBtn') : hide('discoverBtn');
   isReal ? show('dateGroup') : hide('dateGroup');
@@ -1691,6 +1703,7 @@ function collectSettings(){
     cadence:document.getElementById('cadenceSel').value,
     component:document.getElementById('componentSel').value,
     customStations:customStationList.map(s=>({id:s.id,name:s.name,lat:s.lat,lon:s.lon,color:s.color})),
+    pickerStations:STATIONS.filter(s=>s._fromPicker).map(s=>({id:s.id,name:s.name,lat:s.lat,lon:s.lon,color:s.color})),
   };
 }
 function applySettings(s){
@@ -1707,6 +1720,13 @@ function applySettings(s){
   if(s.date!=null) document.getElementById('datePick').value=s.date;
   if(s.cadence!=null) document.getElementById('cadenceSel').value=s.cadence;
   if(s.component!=null) document.getElementById('componentSel').value=s.component;
+  if(Array.isArray(s.pickerStations)){
+    for(const ps of s.pickerStations){
+      if(!STATIONS.some(st=>st.id===ps.id))
+        STATIONS.push({id:ps.id,name:ps.name,lat:ps.lat,lon:ps.lon,
+          color:ps.color||_nextColor(),phaseOffset:0,ampScale:1,usgsAvail:false,_fromPicker:true});
+    }
+  }
   if(Array.isArray(s.customStations)){
     for(const cs of s.customStations){
       if(!STATIONS.some(st=>st.id===cs.id)) addCustomStationEntry(cs);

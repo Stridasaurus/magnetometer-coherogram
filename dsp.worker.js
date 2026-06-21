@@ -1,11 +1,9 @@
 'use strict';
 importScripts('./dsp.js');
 
-let cancelled = false;
-
 self.addEventListener('message', e => {
-  if (e.data.type === 'analyze') { cancelled = false; runDSP(e.data); }
-  else if (e.data.type === 'cancel') { cancelled = true; }
+  if (e.data.type === 'analyze') runDSP(e.data);
+  // 'cancel' is handled by worker.terminate() on the main thread — no flag needed
 });
 
 function runDSP({stationData, settings}) {
@@ -32,17 +30,20 @@ function runDSP({stationData, settings}) {
   if (!testRes) { self.postMessage({type:'error', msg:'Signal too short for coherence'}); return; }
   const allFreqs = testRes.freqs;
   const ulfMask = [];
-  for (let k = 0; k < allFreqs.length; k++) if (allFreqs[k] <= maxFreqHz) ulfMask.push(k);
+  // Start at k=1 to exclude the DC bin (0 Hz) — unstable after first-differencing
+  for (let k = 1; k < allFreqs.length; k++) if (allFreqs[k] <= maxFreqHz) ulfMask.push(k);
   const ulfFreqs = ulfMask.map(k => allFreqs[k]);
   const nULF = ulfFreqs.length;
   const totalSlices = Math.ceil((nSamples - sliceSamples) / stepSamples + 1);
 
   // Sliding window coherogram
+  // pairMatSum accumulates windowed coherence per pair for matrix computation —
+  // gives a consistent "temporal mean of windowed γ²" at all network sizes.
   const times = [], windowStarts = [], coherogramData = [], coherogramPhase = [], pairCohMap = {};
+  const pairMatSum = {};
   let sliceIdx = 0;
   for (let start = 0; start + sliceSamples <= nSamples; start += stepSamples) {
-    if (cancelled) { self.postMessage({type:'cancelled'}); return; }
-    times.push(start + sliceSamples / 2);
+    times.push((start + sliceSamples / 2) / fs);  // seconds, not sample indices
     windowStarts.push(start);
     // Compute each station's FFT segments once, reuse across all pairs
     const segs = {};
@@ -62,6 +63,11 @@ function runDSP({stationData, settings}) {
           sumPhCos[u] += Math.cos(res.phase[ulfMask[u]]);
           pRow[u] = c;
         }
+        // Accumulate for matrix (always — gives consistent definition regardless of skipPairCoh)
+        if (!pairMatSum[pk]) pairMatSum[pk] = {sum: new Float64Array(nULF), cnt: 0};
+        for (let u = 0; u < nULF; u++) pairMatSum[pk].sum[u] += pRow[u];
+        pairMatSum[pk].cnt++;
+        // Store full per-window rows only for small networks (per-pair coherogram modal)
         if (!skipPairCoh) { if (!pairCohMap[pk]) pairCohMap[pk] = []; pairCohMap[pk].push(pRow); }
         pCnt++;
       }
@@ -78,19 +84,16 @@ function runDSP({stationData, settings}) {
   }
   const nTimes = times.length;
 
-  // Cross-coherence matrix — reuse pairCohMap windows; fallback for large networks
+  // Cross-coherence matrix — temporal mean of windowed γ² via pairMatSum
+  // (same definition for all network sizes, no welchCoherence fallback needed)
   const matrixMean = activeList.map(() => new Float64Array(activeList.length));
   for (let i = 0; i < activeList.length; i++) for (let j = 0; j < activeList.length; j++) {
     if (i === j) { matrixMean[i][j] = 1; continue; }
     const [a, b] = i < j ? [activeList[i], activeList[j]] : [activeList[j], activeList[i]];
-    const pk = `${a.id}:${b.id}`, windows = pairCohMap[pk];
-    if (windows && windows.length) {
-      let bm = 0;
-      for (const row of windows) { let s = 0; for (let u = 0; u < nULF; u++) s += row[u]; bm += s / nULF; }
-      matrixMean[i][j] = bm / windows.length;
-    } else {
-      const res = welchCoherence(diffSigs[a.id], diffSigs[b.id], fs, nperseg);
-      if (res) { let s2 = 0, c = 0; for (let u = 0; u < nULF; u++) { s2 += res.coherence[ulfMask[u]]; c++; } matrixMean[i][j] = c ? s2 / c : 0; }
+    const pk = `${a.id}:${b.id}`, entry = pairMatSum[pk];
+    if (entry && entry.cnt) {
+      let bm = 0; for (let u = 0; u < nULF; u++) bm += entry.sum[u] / nULF;
+      matrixMean[i][j] = bm / entry.cnt;
     }
   }
 

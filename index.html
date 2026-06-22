@@ -1158,7 +1158,11 @@ function renderTimeSeries(r){
 function renderFFTSpectra(r){
   const {activeList,stationFFT}=r;
   document.getElementById('fftEmpty').style.display='none';
-  const maxFHz=(parseFloat(document.getElementById('maxFreq').value)||50)/1000;
+  // Reuse the exact band ceiling the analysis used (already clamped to Nyquist),
+  // so the FFT x-axis can't run off into a huge empty span above fs/2. The ×1.1
+  // leaves the band edge a touch inside the axis. Fall back to the raw input only
+  // for results produced before maxFreqHz was carried through.
+  const maxFHz=r.maxFreqHz||(parseFloat(document.getElementById('maxFreq').value)||50)/1000;
   const pFreqs=stationFFT[activeList[0].id].freqs;
   const idx=[]; for(let k=0;k<pFreqs.length;k++) if(pFreqs[k]<=maxFHz*1.1) idx.push(k);
   const stride=Math.max(1,Math.floor(idx.length/250));

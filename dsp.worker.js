@@ -32,6 +32,11 @@ function runDSP({stationData, settings}) {
   const ulfMask = [];
   // Start at k=1 to exclude the DC bin (0 Hz) — unstable after first-differencing
   for (let k = 1; k < allFreqs.length; k++) if (allFreqs[k] <= maxFreqHz) ulfMask.push(k);
+  // Guard: when the band ceiling sits below the first non-DC bin (a tiny maxFreqHz
+  // against a coarse Δf = fs/nfft — e.g. fs=1, nperseg=128 → Δf≈7.8 mHz, max=5 mHz),
+  // ulfMask would be empty and every downstream consumer divides by nULF=0 → NaN.
+  // Always keep at least the lowest resolvable bin so the coherogram stays valid.
+  if (ulfMask.length === 0 && allFreqs.length > 1) ulfMask.push(1);
   const ulfFreqs = ulfMask.map(k => allFreqs[k]);
   const nULF = ulfFreqs.length;
   const totalSlices = Math.ceil((nSamples - sliceSamples) / stepSamples + 1);
@@ -120,6 +125,6 @@ function runDSP({stationData, settings}) {
     coherogramData, coherogramPhase, pairCohMap, times, windowStarts, ulfFreqs, ulfMask, nTimes, nULF,
     activeList, diffSigs, stationFFT, matrixMean, maxCoh, peakFreqHz, nSamples, nPairs,
     useSynth, src, sliceSamples, sigThreshold, allFreqs, nperseg, fs, cadenceSec,
-    pickDate, fillFrac, warnStations, requestedCount
+    maxFreqHz, pickDate, fillFrac, warnStations, requestedCount
   }});
 }

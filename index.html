@@ -486,7 +486,9 @@ const URLS = {
 //   - station= param does not filter; always returns the full network (~200 stations)
 //   - Response is "OK\n[JSON array]" — strip the status line before parsing
 //   - Data lags ~6 weeks; use 60+ days back to ensure availability
-const SUPERMAG_API='/api/supermag'; // proxied by proxy.py to supermag.jhuapl.edu
+const SUPERMAG_API=location.hostname==='localhost'||location.hostname==='127.0.0.1'
+  ?'/api/supermag'                                          // local: proxy.py
+  :'https://delicate-scene-2982.stridasaurus.workers.dev'; // hosted: CF Worker
 // Component is read from #componentSel at fetch time so it can be changed without re-loading
 
 // Fetch real, independent per-station time series from SuperMAG.
